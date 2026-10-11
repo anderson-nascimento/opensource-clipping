@@ -1,9 +1,9 @@
 yt-dlp
 faster-whisper
 google-genai
-jax<0.5.0
-jaxlib<0.5.0
-numpy<2.0.0
+jax>=0.4.35
+jaxlib>=0.4.35
+numpy>=2.0.0
 mediapipe
 opencv-python
 Pillow
@@ -13,7 +13,7 @@ google-api-python-client
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
-ultralytics
+ucltralytics
 pyannote.audio
 torch
 torchaudio

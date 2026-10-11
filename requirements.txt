@@ -1,9 +1,7 @@
 yt-dlp
 faster-whisper
 google-genai
-jax>=0.4.35
-jaxlib>=0.4.35
-numpy>=2.0.0
+numpy
 mediapipe
 opencv-python
 Pillow

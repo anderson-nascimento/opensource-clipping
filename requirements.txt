@@ -1,5 +1,6 @@
 yt-dlp
 faster-whisper
+av<19  # PyAV 19 removeu metadata_errors, usado pelo faster-whisper 1.2.x
 google-genai
 numpy
 mediapipe

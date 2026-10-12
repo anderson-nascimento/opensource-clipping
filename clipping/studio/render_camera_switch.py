@@ -51,12 +51,12 @@ get_face_detector = face_detection.get_face_detector
 broll = _load_studio_internal_module("broll.py", "clipping_studio_broll")
 crop_center_broll = broll.crop_center_broll
 
-def buat_video_camera_switch(
+def create_camera_switch_video(
     input_video,
     output_video,
     start_clip,
     end_clip,
-    rasio,
+    ratio,
     diarization_data,
     cfg,
     label="CameraSwitch",
@@ -87,7 +87,7 @@ def buat_video_camera_switch(
     """
     from clipping.diarization import get_active_speakers
 
-    STEP_DETEKSI     = cfg.track_step if cfg.track_step is not None else 0.25
+    DETECTION_STEP     = cfg.track_step if cfg.track_step is not None else 0.25
     DEADZONE_RATIO   = cfg.track_deadzone if cfg.track_deadzone is not None else 0.15
     SMOOTH_FACTOR    = cfg.track_smooth if cfg.track_smooth is not None else 0.30
     JITTER_THRESHOLD = cfg.track_jitter if cfg.track_jitter is not None else 5
@@ -117,7 +117,7 @@ def buat_video_camera_switch(
     detector = None
     if cfg.face_detector == "yolo":
         if not os.path.exists(cfg.file_yolo_model):
-            print(f"   📥 Mendownload YOLOv8 Face Model ({cfg.yolo_size})...")
+            print(f"   📥 Downloading YOLOv8 Face Model ({cfg.yolo_size})...")
             import urllib.request
 
             urllib.request.urlretrieve(cfg.url_yolo_model, cfg.file_yolo_model)
@@ -136,7 +136,7 @@ def buat_video_camera_switch(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     duration = end_clip - start_clip
 
-    out_w, out_h = _get_render_dims(cfg, rasio, source_h=height)
+    out_w, out_h = _get_render_dims(cfg, ratio, source_h=height)
 
     # 9:16 crop region from the source frame
     crop_ratio = out_w / out_h  # ≈ 0.5625
@@ -162,7 +162,7 @@ def buat_video_camera_switch(
     #   N active + N faces → sort faces by X; sort speakers by label; assign in order
     #   1 active + N faces → use speaker's last-known position to pick nearest face
     #   otherwise          → skip (ambiguous / no data)
-    print(f"🧠 {label} - Analisa wajah (camera switch) dimulai...", flush=True)
+    print(f"🧠 {label} - Face analysis (camera switch) started...", flush=True)
 
     all_frame_data: list[dict] = []  # [{time, face_centers, active_now}]
     speaker_solo_cxs: dict[str, list] = {}  # speaker → [cx, ...] from 1:1 frames
@@ -244,10 +244,10 @@ def buat_video_camera_switch(
             min(100, int(current_time / duration * 100)) if duration > 0 else 100
         )
         if detect_pct != last_detect_percent:
-            print(f"⏳ {label} - Analisa wajah: {detect_pct:3d}%", flush=True)
+            print(f"⏳ {label} - Face analysis: {detect_pct:3d}%", flush=True)
             last_detect_percent = detect_pct
 
-        current_time += STEP_DETEKSI
+        current_time += DETECTION_STEP
 
     # Build canonical center-X per speaker from 1:1 frames
     import statistics as _stats
@@ -478,7 +478,7 @@ def buat_video_camera_switch(
         return []
 
     # FASE 3: RENDER FRAME
-    out_w, out_h = _get_render_dims(cfg, rasio, source_h=height)
+    out_w, out_h = _get_render_dims(cfg, ratio, source_h=height)
     
     dev_visualize = cfg.dev_mode # Assume only for 9:16 as described
     if dev_visualize:
@@ -533,7 +533,7 @@ def buat_video_camera_switch(
         last_render_percent = -1
         tracking_log = [] # Store (t, cx) for each frame
 
-        print(f"🎬 {label} - Render camera switch dimulai...", flush=True)
+        print(f"🎬 {label} - Render camera switch started...", flush=True)
 
         while True:
             ret, frame = cap.read()
@@ -687,18 +687,18 @@ def buat_video_camera_switch(
                     out_frame = _make_blurred_pillarbox(frame)
 
             # --- B-ROLL OVERLAY ---
-            waktu_absolut = start_clip + t
+            absolute_time = start_clip + t
             TRANSITION_DUR = 0.3
             MAX_ZOOM = 1.10
             for bc in broll_caps:
-                if bc["start"] <= waktu_absolut <= bc["end"]:
-                    elapsed_broll = waktu_absolut - bc["start"]
+                if bc["start"] <= absolute_time <= bc["end"]:
+                    elapsed_broll = absolute_time - bc["start"]
                     bc["cap"].set(cv2.CAP_PROP_POS_MSEC, elapsed_broll * 1000)
                     ret_b, frame_b = bc["cap"].read()
 
                     if ret_b:
-                        durasi_total_broll = bc["end"] - bc["start"]
-                        progress_broll = elapsed_broll / durasi_total_broll if durasi_total_broll > 0 else 0
+                        total_broll_duration = bc["end"] - bc["start"]
+                        progress_broll = elapsed_broll / total_broll_duration if total_broll_duration > 0 else 0
                         zoom_factor = 1.0 + ((MAX_ZOOM - 1.0) * progress_broll)
 
                         frame_b_crop = crop_center_broll(frame_b, out_w, out_h)
@@ -708,8 +708,8 @@ def buat_video_camera_switch(
                         alpha = 1.0
                         if elapsed_broll < TRANSITION_DUR:
                             alpha = elapsed_broll / TRANSITION_DUR
-                        elif (bc["end"] - waktu_absolut) < TRANSITION_DUR:
-                            alpha = (bc["end"] - waktu_absolut) / TRANSITION_DUR
+                        elif (bc["end"] - absolute_time) < TRANSITION_DUR:
+                            alpha = (bc["end"] - absolute_time) / TRANSITION_DUR
 
                         if alpha >= 1.0:
                             out_frame = frame_b_zoomed
@@ -740,9 +740,9 @@ def buat_video_camera_switch(
         return_code = writer.wait()
 
         if return_code != 0:
-            raise RuntimeError(f"FFmpeg writer gagal: {stderr_data[-1000:]}")
+            raise RuntimeError(f"FFmpeg writer failed: {stderr_data[-1000:]}")
 
-        print(f"✅ {label} selesai.", flush=True)
+        print(f"✅ {label} done.", flush=True)
 
         # Helper for subtitle positioning
         def get_x_final(t):

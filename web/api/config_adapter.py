@@ -23,12 +23,12 @@ from clipping.config import (
     BGM_MODE,
     BGM_MOODS,
     BGM_DIR,
-    DAFTAR_FONT,
+    FONT_LIST,
     GEMINI_FALLBACK_MODEL,
-    NAMA_FONT_THUMBNAIL,
+    THUMBNAIL_FONT_NAME,
     RENDER_OUTPUT_HEIGHT,
-    SCALE_KATA_KHUSUS_169,
-    SCALE_KATA_KHUSUS_916,
+    SPECIAL_WORD_SCALE_169,
+    SPECIAL_WORD_SCALE_916,
     URL_FONT_THUMBNAIL,
     URL_GLITCH_VIDEO,
     URL_MEDIAPIPE_MODEL,
@@ -36,7 +36,7 @@ from clipping.config import (
     VIDEO_QUALITY_CQ,
     VIDEO_QUALITY_CRF,
     VIDEO_SCALE_ALGO,
-    WARNA_KATA_KHUSUS,
+    SPECIAL_WORD_COLOR,
 )
 
 
@@ -97,13 +97,17 @@ def build_config_from_payload(
     # Determine video input path
     upload_filename = payload.get("upload_filename")
     if upload_filename:
-        file_video_asli = os.path.abspath(
+        original_video_file = os.path.abspath(
             os.path.join(base_dir, "uploads", upload_filename)
         )
     else:
-        file_video_asli = os.path.abspath(
-            os.path.join(outputs_dir, "video_asli.mp4")
+        original_video_file = os.path.abspath(
+            os.path.join(outputs_dir, "original_video.mp4")
         )
+        # Jobs created before the rename stored the source as video_asli.mp4
+        legacy_video_file = os.path.join(outputs_dir, "video_asli.mp4")
+        if not os.path.exists(original_video_file) and os.path.exists(legacy_video_file):
+            original_video_file = os.path.abspath(legacy_video_file)
 
     # Auto-detect youtube_cookies.txt for yt-dlp
     default_cookies_path = os.path.join(base_dir, "youtube_cookies.txt")
@@ -114,9 +118,9 @@ def build_config_from_payload(
         base_dir=base_dir,
         outputs_dir=outputs_dir,
         font_dir=font_dir,
-        file_video_asli=file_video_asli,
+        original_video_file=original_video_file,
         file_font_thumbnail=os.path.abspath(
-            os.path.join(base_dir, NAMA_FONT_THUMBNAIL)
+            os.path.join(base_dir, THUMBNAIL_FONT_NAME)
         ),
         file_mediapipe_model=os.path.abspath(
             os.path.join(base_dir, "blaze_face_full_range.tflite")
@@ -135,14 +139,14 @@ def build_config_from_payload(
         # Pengaturan utama
         source_platform=source_platform,
         url_youtube=payload.get("url"),
-        jumlah_clip=payload.get("clips", 7),
-        pilihan_rasio=payload.get("ratio", "9:16"),
+        num_clips=payload.get("clips", 7),
+        aspect_ratio=payload.get("ratio", "9:16"),
         download_source_height=source_height,
         render_output_height=render_height,
         yt_cookies=yt_cookies,
         # Konten & Hook
-        max_kata_per_subtitle=payload.get("words_per_sub", 5),
-        durasi_hook=payload.get("hook_duration", 3),
+        max_words_per_subtitle=payload.get("words_per_sub", 5),
+        hook_duration=payload.get("hook_duration", 3),
         hook_source=None,
         hook_source_start=0.0,
         # Hook V2 & Segment Trimming
@@ -169,20 +173,20 @@ def build_config_from_payload(
         split_max_zoom=payload.get("split_max_zoom", 2.5),
         # Subtitle & Tipografi
         no_subs=payload.get("no_subs", False),
-        gaya_font_aktif=payload.get("font_style", "HORMOZI"),
-        daftar_font=DAFTAR_FONT,
+        active_font_style=payload.get("font_style", "HORMOZI"),
+        font_list=FONT_LIST,
         use_advanced_text=payload.get("advanced_text", False),
         use_advanced_text_on_hook=payload.get("advanced_text_hook", False),
         # ASS position values
         ass_align_916=ASS_ALIGN_916,
         ass_margin_916=ASS_MARGIN_916,
         ass_font_916=ASS_FONT_916,
-        scale_kata_khusus_916=SCALE_KATA_KHUSUS_916,
+        special_word_scale_916=SPECIAL_WORD_SCALE_916,
         ass_align_169=ASS_ALIGN_169,
         ass_margin_169=ASS_MARGIN_169,
         ass_font_169=ASS_FONT_169,
-        scale_kata_khusus_169=SCALE_KATA_KHUSUS_169,
-        warna_kata_khusus=WARNA_KATA_KHUSUS,
+        special_word_scale_169=SPECIAL_WORD_SCALE_169,
+        special_word_color=SPECIAL_WORD_COLOR,
         # Asset URLs
         url_font_thumbnail=URL_FONT_THUMBNAIL,
         url_glitch_video=URL_GLITCH_VIDEO,

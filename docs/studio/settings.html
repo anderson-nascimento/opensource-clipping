@@ -85,7 +85,7 @@
                 <!-- Page Header -->
                 <div class="mb-8">
                     <h1 class="font-display font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white">Settings</h1>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Konfigurasi API keys dan default settings</p>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Configure API keys and default settings</p>
                 </div>
 
                 <!-- Loading -->
@@ -324,7 +324,7 @@
 
                 if (Object.keys(payload).length === 0) {
                     msg.className = 'text-sm mb-4 text-amber-500';
-                    msg.textContent = 'Tidak ada perubahan';
+                    msg.textContent = 'No changes';
                     msg.classList.remove('hidden');
                     return;
                 }
@@ -338,14 +338,14 @@
                 document.getElementById('input-nvidia-key').value = '';
 
                 msg.className = 'text-sm mb-4 text-emerald-500';
-                msg.textContent = '✅ Settings berhasil diperbarui!';
+                msg.textContent = '✅ Settings updated successfully!';
                 msg.classList.remove('hidden');
 
                 // Reload to show updated badges
                 setTimeout(() => loadSettings(), 500);
             } catch (err) {
                 msg.className = 'text-sm mb-4 text-red-500';
-                msg.textContent = '❌ Gagal menyimpan: ' + err.message;
+                msg.textContent = '❌ Failed to save: ' + err.message;
                 msg.classList.remove('hidden');
             } finally {
                 btn.disabled = false;

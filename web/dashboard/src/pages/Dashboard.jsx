@@ -57,7 +57,7 @@ function Dashboard() {
       <div className="page-header">
         <div>
           <h2>Dashboard</h2>
-          <p>Overview semua clipping jobs</p>
+          <p>Overview of all clipping jobs</p>
         </div>
         <Link to="/new" className="btn btn-primary">
           ➕ New Job
@@ -100,8 +100,8 @@ function Dashboard() {
       ) : jobs.length === 0 ? (
         <div className="empty-state">
           <div className="icon">🎬</div>
-          <h3>Belum ada job</h3>
-          <p>Buat job pertama untuk memulai clipping video otomatis dengan AI.</p>
+          <h3>No jobs yet</h3>
+          <p>Create your first job to start automatic AI video clipping.</p>
           <Link to="/new" className="btn btn-primary">➕ Create First Job</Link>
         </div>
       ) : (

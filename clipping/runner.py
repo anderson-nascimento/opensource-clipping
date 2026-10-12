@@ -40,7 +40,7 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
     source_platform = getattr(cfg, "source_platform", "youtube")
     engine.download_video(
         cfg.url_youtube,
-        cfg.file_video_asli,
+        cfg.original_video_file,
         getattr(cfg, "use_dlp_subs", False),
         getattr(cfg, "download_source_height", "max"),
         source_platform=source_platform,
@@ -48,13 +48,13 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
     )
 
     # Step 2 — Transcribe
-    transkrip_lengkap = ""
-    data_segmen = []
+    full_transcript = ""
+    transcript_segments = []
 
     import glob
 
     # Mencari file json3 apapun (karena bahasanya bisa .id.json3 atau .en.json3)
-    json3_files = glob.glob(cfg.file_video_asli.replace(".mp4", ".*.json3"))
+    json3_files = glob.glob(cfg.original_video_file.replace(".mp4", ".*.json3"))
     file_json3 = json3_files[0] if json3_files else None
 
     # Only run YouTube JSON3 subtitle search for YouTube sources
@@ -64,18 +64,18 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
             and file_json3
             and os.path.exists(file_json3)
         ):
-            transkrip_lengkap, data_segmen = engine.parse_youtube_json3_subs(
-                file_json3, max_words_per_subtitle=cfg.max_kata_per_subtitle
+            full_transcript, transcript_segments = engine.parse_youtube_json3_subs(
+                file_json3, max_words_per_subtitle=cfg.max_words_per_subtitle
             )
-            if transkrip_lengkap and data_segmen:
+            if full_transcript and transcript_segments:
                 print(
-                    f"✅ Berhasil memparsing subtitle dari YouTube ({os.path.basename(file_json3)}), melewati proses Whisper."
+                    f"✅ Successfully parsed YouTube subtitles ({os.path.basename(file_json3)}), skipping Whisper."
                 )
 
-    if not transkrip_lengkap or not data_segmen:
-        transkrip_lengkap, data_segmen = engine.transcribe_video(
-            cfg.file_video_asli,
-            max_words_per_subtitle=cfg.max_kata_per_subtitle,
+    if not full_transcript or not transcript_segments:
+        full_transcript, transcript_segments = engine.transcribe_video(
+            cfg.original_video_file,
+            max_words_per_subtitle=cfg.max_words_per_subtitle,
             model_size=cfg.whisper_model,
             device=cfg.whisper_device,
             compute_type=cfg.whisper_compute_type,
@@ -86,51 +86,51 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
     gemini_output_path = os.path.join(cfg.outputs_dir, "gemini_response.json")
     
     if getattr(cfg, "load_gemini_json", False) and os.path.exists(gemini_output_path):
-        print(f"\n🔄 [3/3] Memuat data AI ({cfg.ai_provider}) dari file lokal: {gemini_output_path}")
+        print(f"\n🔄 [3/3] Loading AI data ({cfg.ai_provider}) from local file: {gemini_output_path}")
         with open(gemini_output_path, "r", encoding="utf-8") as f:
-            hasil_json = json.load(f)
+            ai_clips = json.load(f)
     else:
-        hasil_json = engine.analyze_with_ai(transkrip_lengkap, cfg)
+        ai_clips = engine.analyze_with_ai(full_transcript, cfg)
         
         # Save raw gemini json for future loading/reproduction
         with open(gemini_output_path, "w", encoding="utf-8") as f:
-            json.dump(hasil_json, f, indent=4, ensure_ascii=False)
-        print(f"💾 Raw AI response tersimpan di: {gemini_output_path}")
+            json.dump(ai_clips, f, indent=4, ensure_ascii=False)
+        print(f"💾 Raw AI response saved to: {gemini_output_path}")
 
     # Step 4 — Metadata normalisation
-    hasil_json = metadata.normalize_and_validate(hasil_json)
-    metadata.print_preview(hasil_json)
+    ai_clips = metadata.normalize_and_validate(ai_clips)
+    metadata.print_preview(ai_clips)
 
     metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
-    metadata.save_metadata_preview(hasil_json, path=metadata_path)
+    metadata.save_metadata_preview(ai_clips, path=metadata_path)
 
     # Step 5 — Diarization (split-screen / camera-switch)
     diarization_data = None
     if (
         (getattr(cfg, "use_split_screen", False) and cfg.split_trigger == "diarization")
         or getattr(cfg, "use_camera_switch", False)
-    ) and studio._is_vertical_ratio(cfg.pilihan_rasio):
+    ) and studio._is_vertical_ratio(cfg.aspect_ratio):
         try:
             mode_label = (
                 "Split-Screen"
                 if getattr(cfg, "use_split_screen", False)
                 else "Camera-Switch"
             )
-            print(f"\n🎙️ [{mode_label}] Menjalankan speaker diarization...")
-            audio_path = cfg.file_video_asli.replace(".mp4", "_audio.wav")
-            diarization_mod.extract_audio(cfg.file_video_asli, audio_path)
+            print(f"\n🎙️ [{mode_label}] Running speaker diarization...")
+            audio_path = cfg.original_video_file.replace(".mp4", "_audio.wav")
+            diarization_mod.extract_audio(cfg.original_video_file, audio_path)
             num_speakers_arg = getattr(cfg, "diarization_num_speakers", 2)
             min_spk = None
             max_spk = None
 
             if str(num_speakers_arg).lower() == "auto":
                 max_faces = studio.estimate_speaker_count_from_video(
-                    cfg.file_video_asli, cfg
+                    cfg.original_video_file, cfg
                 )
                 num_speakers_arg = "auto"
                 min_spk = max(1, max_faces)
                 max_spk = min_spk + 2
-                print(f"   ℹ️ Instruksi Pyannote: {min_spk} hingga {max_spk} speaker.")
+                print(f"   ℹ️ Pyannote hint: {min_spk} to {max_spk} speakers.")
 
             diarization_data = diarization_mod.run_diarization(
                 audio_path,
@@ -143,8 +143,8 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
             if os.path.exists(audio_path):
                 os.remove(audio_path)
         except Exception as e:
-            print(f"⚠️ Diarization gagal: {e}")
-            print("   Fallback ke mode render biasa (tanpa split-screen).")
+            print(f"⚠️ Diarization failed: {e}")
+            print("   Falling back to normal render mode (no split-screen).")
             diarization_data = None
 
     # Step 6 — Video encoder & glitch
@@ -154,25 +154,25 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
     
     # Get target dimensions for auto-bitrate calculation
     import cv2
-    cap_e = cv2.VideoCapture(cfg.file_video_asli)
+    cap_e = cv2.VideoCapture(cfg.original_video_file)
     src_h_e = int(cap_e.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap_e.release()
     
-    target_w_e, target_h_e = studio._get_render_dims(cfg, cfg.pilihan_rasio, source_h=src_h_e)
+    target_w_e, target_h_e = studio._get_render_dims(cfg, cfg.aspect_ratio, source_h=src_h_e)
     video_encoder = studio.detect_video_encoder(cfg, target_h=target_h_e)
 
     file_glitch_ts = None
     if cfg.use_hook_glitch:
-        print("⚙️ Menyiapkan Video Glitch Transisi...")
+        print("⚙️ Preparing glitch transition video...")
         
         # Get source dimensions for proper glitch scaling
         import cv2
-        cap_g = cv2.VideoCapture(cfg.file_video_asli)
+        cap_g = cv2.VideoCapture(cfg.original_video_file)
         source_h_g = int(cap_g.get(cv2.CAP_PROP_FRAME_HEIGHT))
         cap_g.release()
 
-        file_glitch_ts = studio.siapkan_glitch_video(
-            cfg.pilihan_rasio, cfg, video_encoder, source_h=source_h_g
+        file_glitch_ts = studio.prepare_glitch_video(
+            cfg.aspect_ratio, cfg, video_encoder, source_h=source_h_g
         )
 
     # Step 6 — Render each clip
@@ -180,20 +180,20 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
 
     custom_hook_path = None
     if getattr(cfg, "hook_source", None):
-        print("\n🎣 Mengunduh sumber klip Hook kustom...")
+        print("\n🎣 Downloading custom Hook clip source...")
         custom_hook_path = hook_manager.download_custom_hook(cfg)
 
     # Step 5.5 — Generate Voice-Over (if enabled)
     if getattr(cfg, "voiceover", False):
-        print(f"\n🎙️ Meng-generate Voice-Over untuk {len(hasil_json)} klip...")
-        for klip in hasil_json:
+        print(f"\n🎙️ Generating Voice-Over for {len(ai_clips)} clips...")
+        for clip_item in ai_clips:
             try:
                 # 1. Generate commentary script from snippet
-                start = float(klip["start_time"])
-                end = float(klip["end_time"])
+                start = float(clip_item["start_time"])
+                end = float(clip_item["end_time"])
                 # Extract transcript snippet for this time range
                 snippet_lines = []
-                for seg in data_segmen:
+                for seg in transcript_segments:
                     if float(seg["end"]) > start and float(seg["start"]) < end:
                         # Support both Whisper format (has 'text') and YouTube JSON3 (only 'words')
                         seg_text = seg.get("text") or " ".join(w["word"] for w in seg.get("words", []))
@@ -215,11 +215,11 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
                         script,
                         cfg.voiceover_voice,
                         cfg.outputs_dir,
-                        str(klip["rank"])
+                        str(clip_item["rank"])
                     )
                     
                     if os.path.exists(audio_path):
-                        klip["voiceover"] = {
+                        clip_item["voiceover"] = {
                             "script": script,
                             "audio_path": audio_path,
                             "segments": vo_segments,
@@ -227,25 +227,25 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
                         }
 
             except Exception as e:
-                print(f"   ⚠️ Gagal generate voice-over untuk Rank {klip['rank']}: {e}")
+                print(f"   ⚠️ Failed to generate voice-over for Rank {clip_item['rank']}: {e}")
 
-    for klip in sorted(hasil_json, key=lambda x: x["rank"]):
+    for clip_item in sorted(ai_clips, key=lambda x: x["rank"]):
         
         if custom_hook_path:
-            klip["custom_hook_info"] = {"file_path": custom_hook_path}
+            clip_item["custom_hook_info"] = {"file_path": custom_hook_path}
 
-        hasil_render = studio.proses_klip(
-            klip["rank"],
-            klip,
-            cfg.pilihan_rasio,
+        render_result = studio.process_clip(
+            clip_item["rank"],
+            clip_item,
+            cfg.aspect_ratio,
             file_glitch_ts,
-            data_segmen,
+            transcript_segments,
             cfg,
             video_encoder,
             diarization_data=diarization_data,
         )
-        if hasil_render:
-            render_manifest.append(hasil_render)
+        if render_result:
+            render_manifest.append(render_result)
 
     # Step 7 — Inject source metadata for attribution & safety tracking
     for row in render_manifest:
@@ -259,7 +259,7 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
         json.dump(render_manifest, f, ensure_ascii=False, indent=2)
 
     print(
-        f"\n💾 Render manifest disimpan ke {manifest_path} ({len(render_manifest)} item)"
+        f"\n💾 Render manifest saved to {manifest_path} ({len(render_manifest)} item)"
     )
 
 

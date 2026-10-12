@@ -56,9 +56,9 @@ def main():
     # Kalau belum ada, script dihentikan karena OAuth flow tidak bisa dimulai.
     if not os.path.exists(CLIENT_SECRET_FILE):
         raise FileNotFoundError(
-            f"{CLIENT_SECRET_FILE} tidak ditemukan. "
-            "Download OAuth Client ID JSON dari Google Cloud, rename jadi client_secret.json, "
-            "lalu simpan ke folder .credentials/"
+            f"{CLIENT_SECRET_FILE} not found. "
+            "Download the OAuth Client ID JSON from Google Cloud, rename it to client_secret.json, "
+            "then save it to the .credentials/ folder"
         )
 
     # Pastikan folder .credentials tersedia.
@@ -99,7 +99,7 @@ def main():
     with open(TOKEN_FILE, "w", encoding="utf-8") as f:
         f.write(creds.to_json())
 
-    print(f"✅ Token berhasil dibuat: {TOKEN_FILE}")
+    print(f"✅ Token created: {TOKEN_FILE}")
 
 
 # Bagian ini membuat main() hanya berjalan kalau file ini dijalankan langsung:

@@ -25,12 +25,12 @@ BASE_DIR = os.getcwd()
 FONT_DIR = os.path.abspath(os.path.join(BASE_DIR, "custom_fonts"))
 
 # 1. PENGATURAN UTAMA
-JUMLAH_CLIP = 7
-PILIHAN_RASIO = "9:16"
+NUM_CLIPS = 7
+ASPECT_RATIO = "9:16"
 
 # 2. PENGATURAN KONTEN & HOOK
-MAX_KATA_PER_SUBTITLE = 5
-DURASI_HOOK = 3
+MAX_WORDS_PER_SUBTITLE = 5
+HOOK_DURATION = 3
 USE_BROLL = True
 USE_HOOK_GLITCH = True
 USE_SPLIT_SCREEN = False
@@ -47,60 +47,60 @@ USE_ADVANCED_TEXT = False
 USE_ADVANCED_TEXT_ON_HOOK = False
 USE_KARAOKE_EFFECT = True
 
-GAYA_FONT_AKTIF = "HORMOZI"
+ACTIVE_FONT_STYLE = "HORMOZI"
 
-DAFTAR_FONT = {
+FONT_LIST = {
     "DEFAULT": {
-        "utama": {
-            "nama": "Montserrat Black",
+        "main": {
+            "name": "Montserrat Black",
             "file": "Montserrat-Black.ttf",
             "url": "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Black.ttf",
             "bold": 1,
         },
-        "khusus": {
-            "nama": "Montserrat Medium",
+        "special": {
+            "name": "Montserrat Medium",
             "file": "Montserrat-Medium.ttf",
             "url": "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Medium.ttf",
             "bold": 0,
         },
     },
     "STORYTELLER": {
-        "utama": {
-            "nama": "Inter",
+        "main": {
+            "name": "Inter",
             "file": "Inter-Regular.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.ttf",
             "bold": 0,
         },
-        "khusus": {
-            "nama": "Lora",
+        "special": {
+            "name": "Lora",
             "file": "Lora-Bold.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/lora@latest/latin-700-normal.ttf",
             "bold": 1,
         },
     },
     "HORMOZI": {
-        "utama": {
-            "nama": "Montserrat",
+        "main": {
+            "name": "Montserrat",
             "file": "Montserrat-Regular.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/montserrat@latest/latin-400-normal.ttf",
             "bold": 0,
         },
-        "khusus": {
-            "nama": "Anton",
+        "special": {
+            "name": "Anton",
             "file": "Anton-Regular.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/anton@latest/latin-400-normal.ttf",
             "bold": 0,
         },
     },
     "CINEMATIC": {
-        "utama": {
-            "nama": "Roboto",
+        "main": {
+            "name": "Roboto",
             "file": "Roboto-Regular.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/roboto@latest/latin-400-normal.ttf",
             "bold": 0,
         },
-        "khusus": {
-            "nama": "Bebas Neue",
+        "special": {
+            "name": "Bebas Neue",
             "file": "BebasNeue-Regular.ttf",
             "url": "https://cdn.jsdelivr.net/fontsource/fonts/bebas-neue@latest/latin-400-normal.ttf",
             "bold": 0,
@@ -112,19 +112,19 @@ DAFTAR_FONT = {
 ASS_ALIGN_916 = 2
 ASS_MARGIN_916 = 450
 ASS_FONT_916 = 90
-SCALE_KATA_KHUSUS_916 = ASS_FONT_916 + 120
+SPECIAL_WORD_SCALE_916 = ASS_FONT_916 + 120
 
 # Khusus 16:9 (Horizontal)
 ASS_ALIGN_169 = 2
 ASS_MARGIN_169 = 70
 ASS_FONT_169 = 80
-SCALE_KATA_KHUSUS_169 = ASS_FONT_169 + 120
+SPECIAL_WORD_SCALE_169 = ASS_FONT_169 + 120
 
 # Warna Kata Khusus  (Format ASS: BGR -> &H[Blue][Green][Red]&)
-WARNA_KATA_KHUSUS = "&HFFFFFF&"
+SPECIAL_WORD_COLOR = "&HFFFFFF&"
 
 # 4. PENGATURAN ASSET EKSTERNAL
-NAMA_FONT_THUMBNAIL = "Montserrat-Black.ttf"
+THUMBNAIL_FONT_NAME = "Montserrat-Black.ttf"
 URL_FONT_THUMBNAIL = (
     "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/Montserrat-Black.ttf"
 )
@@ -252,13 +252,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--clips",
         "-n",
         type=int,
-        default=JUMLAH_CLIP,
+        default=NUM_CLIPS,
         help="Number of highlight clips to generate",
     )
     p.add_argument(
         "--ratio",
         "-r",
-        default=PILIHAN_RASIO,
+        default=ASPECT_RATIO,
         choices=["9:16", "16:9", "1:1", "3:4", "4:5"],
         help="Output aspect ratio",
     )
@@ -278,13 +278,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--words-per-sub",
         type=int,
-        default=MAX_KATA_PER_SUBTITLE,
+        default=MAX_WORDS_PER_SUBTITLE,
         help="Max words per karaoke subtitle group",
     )
     p.add_argument(
         "--hook-duration",
         type=int,
-        default=DURASI_HOOK,
+        default=HOOK_DURATION,
         help="Hook teaser duration in seconds",
     )
     p.add_argument(
@@ -396,7 +396,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # --- Subtitle & Tipografi ---
     p.add_argument(
         "--font-style",
-        default=GAYA_FONT_AKTIF,
+        default=ACTIVE_FONT_STYLE,
         choices=["DEFAULT", "STORYTELLER", "HORMOZI", "CINEMATIC"],
         help="Font style preset",
     )
@@ -790,23 +790,23 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     # Validate watermark args
     if args.watermark:
         if not args.text and not args.image:
-            parser.error("--watermark membutuhkan --text atau --image.")
+            parser.error("--watermark requires --text or --image.")
         if not (1 <= args.opacity <= 100):
-            parser.error(f"--opacity harus antara 1-100, diberikan: {args.opacity}")
+            parser.error(f"--opacity must be between 1-100, got: {args.opacity}")
         if args.padding < 0:
-            parser.error(f"--padding tidak boleh negatif, diberikan: {args.padding}")
+            parser.error(f"--padding cannot be negative, got: {args.padding}")
         if args.watermark_font_size < 0:
-            parser.error(f"--watermark-font-size tidak boleh negatif, diberikan: {args.watermark_font_size}")
+            parser.error(f"--watermark-font-size cannot be negative, got: {args.watermark_font_size}")
         if not (1 <= args.watermark_scale <= 100):
-            parser.error(f"--watermark-scale harus antara 1-100, diberikan: {args.watermark_scale}")
+            parser.error(f"--watermark-scale must be between 1-100, got: {args.watermark_scale}")
         if args.image:
             if not os.path.exists(args.image):
-                parser.error(f"File watermark image tidak ditemukan: {args.image}")
+                parser.error(f"Watermark image file not found: {args.image}")
             valid_exts = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff")
             if not args.image.lower().endswith(valid_exts):
                 parser.error(
-                    f"Format file watermark image tidak didukung: {args.image}. "
-                    f"Format yang didukung: {', '.join(valid_exts)}"
+                    f"Unsupported watermark image format: {args.image}. "
+                    f"Supported formats: {', '.join(valid_exts)}"
                 )
 
     base_dir = os.getcwd()
@@ -820,9 +820,9 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         base_dir=base_dir,
         outputs_dir=outputs_dir,
         font_dir=font_dir,
-        file_video_asli=os.path.abspath(os.path.join(base_dir, "video_asli.mp4")),
+        original_video_file=os.path.abspath(os.path.join(base_dir, "original_video.mp4")),
         file_font_thumbnail=os.path.abspath(
-            os.path.join(base_dir, NAMA_FONT_THUMBNAIL)
+            os.path.join(base_dir, THUMBNAIL_FONT_NAME)
         ),
         file_mediapipe_model=os.path.abspath(
             os.path.join(base_dir, "blaze_face_full_range.tflite")
@@ -844,13 +844,13 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         url_list=url_list,
         yt_cookies=args.yt_cookies,
         cleanup_source=args.cleanup_source,
-        jumlah_clip=args.clips,
-        pilihan_rasio=args.ratio,
+        num_clips=args.clips,
+        aspect_ratio=args.ratio,
         download_source_height=args.source_height,
         render_output_height=args.render_height,
         # Konten & Hook
-        max_kata_per_subtitle=args.words_per_sub,
-        durasi_hook=args.hook_duration,
+        max_words_per_subtitle=args.words_per_sub,
+        hook_duration=args.hook_duration,
         hook_source=args.hook_source,
         hook_source_start=args.hook_source_start,
         # Hook V2 & Segment Trimming
@@ -877,20 +877,20 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         split_max_zoom=args.split_max_zoom,
         # Subtitle & Tipografi
         no_subs=args.no_subs,
-        gaya_font_aktif=args.font_style,
-        daftar_font=DAFTAR_FONT,
+        active_font_style=args.font_style,
+        font_list=FONT_LIST,
         use_advanced_text=args.advanced_text,
         use_advanced_text_on_hook=args.advanced_text_hook,
         # ASS position values
         ass_align_916=ASS_ALIGN_916,
         ass_margin_916=ASS_MARGIN_916,
         ass_font_916=ASS_FONT_916,
-        scale_kata_khusus_916=SCALE_KATA_KHUSUS_916,
+        special_word_scale_916=SPECIAL_WORD_SCALE_916,
         ass_align_169=ASS_ALIGN_169,
         ass_margin_169=ASS_MARGIN_169,
         ass_font_169=ASS_FONT_169,
-        scale_kata_khusus_169=SCALE_KATA_KHUSUS_169,
-        warna_kata_khusus=WARNA_KATA_KHUSUS,
+        special_word_scale_169=SPECIAL_WORD_SCALE_169,
+        special_word_color=SPECIAL_WORD_COLOR,
         # Asset URLs
         url_font_thumbnail=URL_FONT_THUMBNAIL,
         url_glitch_video=URL_GLITCH_VIDEO,

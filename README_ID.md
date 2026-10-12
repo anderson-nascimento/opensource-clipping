@@ -106,7 +106,7 @@ WHISPER_COMPUTE_TYPE = "float32"
   --no-bgm
 ```
 
-> 💡 **Baru pertama kali?** Gunakan **[Quick Start Notebook](notebooks/Quick_Start.ipynb)** — notebook yang ramah pemula dengan konfigurasi minimal, instruksi langkah demi langkah dalam Bahasa Inggris, dan hanya 3 pengaturan yang perlu diubah (URL YouTube, jumlah klip, dan model Whisper).
+> 💡 **Baru pertama kali?** Gunakan **[Quick Start Notebook](notebooks/OpenClippingQuickStart.ipynb)** — notebook yang ramah pemula dengan konfigurasi minimal, instruksi langkah demi langkah dalam Bahasa Inggris, dan hanya 3 pengaturan yang perlu diubah (URL YouTube, jumlah klip, dan model Whisper).
 >
 > Kami juga menyertakan `notebooks/Lib_OpenSource_Clipping.ipynb` sebagai template lengkap.
 

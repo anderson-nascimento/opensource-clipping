@@ -110,6 +110,14 @@ def create_hybrid_video(
     # JITTER_THRESHOLD = 4     # [OLD] Abaikan pergeseran di bawah 4 pixel (Anti-getar/Micro-jitter)
 
     SNAP_THRESHOLD   = cfg.track_snap if cfg.track_snap is not None else 0.25  # Jika wajah lompat > 25% lebar layar, anggap ganti orang (Hard Cut)
+
+    # A new face position must persist this long before the camera cuts to it,
+    # and after a cut the camera holds for at least TRACK_HOLD seconds. Without
+    # this, two similar-sized faces make the "largest face" flip every sample
+    # and the crop jumps side to side in under a second.
+    _track_hold = getattr(cfg, "track_hold", None)
+    TRACK_HOLD       = _track_hold if _track_hold is not None else 2.0
+    SNAP_CONFIRM     = 0.5
     # SNAP_THRESHOLD   = 0.30  # [NEW; NOT USED] Jika wajah lompat > 30% lebar layar, anggap ganti orang (Hard Cut)
     # =======================================================
 
@@ -246,13 +254,29 @@ def create_hybrid_video(
         temp_snap = SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08
         snap_px = width * temp_snap
 
+        last_cut_time = float("-inf")
+        cand_cx = None      # position of a pending cut target
+        cand_idx = None     # index in smooth_data where the target first appeared
+
         for d in raw_data:
             face_cx = d["cx"]
             face_cy = d["cy"]
 
             if abs(face_cx - cam_cx) > snap_px:
-                cam_cx = face_cx
+                if cand_cx is None or abs(face_cx - cand_cx) > snap_px:
+                    cand_cx, cand_idx = face_cx, len(smooth_data)
+                cand_time = raw_data[cand_idx]["time"]
+                if (d["time"] - cand_time >= SNAP_CONFIRM
+                        and cand_time - last_cut_time >= TRACK_HOLD):
+                    # Cut back-dated to when the new face first appeared, so the
+                    # confirmation delay does not make the camera lag behind.
+                    cam_cx = face_cx
+                    for prev in smooth_data[cand_idx:]:
+                        prev["cx"] = cam_cx
+                    last_cut_time = cand_time
+                    cand_cx = None
             else:
+                cand_cx = None
                 if face_cx > cam_cx + deadzone_px:
                     cam_cx += (face_cx - (cam_cx + deadzone_px)) * SMOOTH_FACTOR
                 elif face_cx < cam_cx - deadzone_px:

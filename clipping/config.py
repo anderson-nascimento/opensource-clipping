@@ -48,6 +48,7 @@ USE_ADVANCED_TEXT_ON_HOOK = False
 USE_KARAOKE_EFFECT = True
 
 ACTIVE_FONT_STYLE = "HORMOZI"
+CAPTION_STYLE = "classic"
 
 FONT_LIST = {
     "DEFAULT": {
@@ -155,8 +156,9 @@ RENDER_OUTPUT_HEIGHT = 1080
 # AI Provider
 AI_PROVIDER = "gemini"
 NVIDIA_MODEL = "deepseek-ai/deepseek-v4-pro"
-GEMINI_MODEL = "gemini-3-flash-preview"
-GEMINI_FALLBACK_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
+CONTENT_LANG = "en"  # language of titles, captions, hashtags and thumbnail text
+GEMINI_FALLBACK_MODEL = "gemini-3.8-flash"
 
 
 # ==============================================================================
@@ -301,6 +303,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-broll", action="store_true", help="Disable B-roll footage")
     p.add_argument("--no-hook", action="store_true", help="Disable hook glitch teaser")
     p.add_argument(
+        "--hook-transition",
+        choices=["flash", "glitch"],
+        default="flash",
+        help="Transition between the hook teaser and the clip: a short white flash (default) or the VHS glitch",
+    )
+    p.add_argument(
         "--cleanup-source",
         action="store_true",
         default=False,
@@ -395,6 +403,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # --- Subtitle & Tipografi ---
     p.add_argument(
+        "--caption-style",
+        choices=["classic", "box", "yellow_pop", "one_word"],
+        default=CAPTION_STYLE,
+        help="Caption look: classic (original), box (word in a colored box), "
+             "yellow_pop (word turns yellow and pops), one_word (one big word at a time)",
+    )
+    p.add_argument(
+        "--caption-color",
+        default=None,
+        help="Accent color for --caption-style as #RRGGBB (box color / highlighted word)",
+    )
+    p.add_argument(
         "--font-style",
         default=ACTIVE_FONT_STYLE,
         choices=["DEFAULT", "STORYTELLER", "HORMOZI", "CINEMATIC"],
@@ -459,6 +479,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Model name for NVIDIA NIM API (e.g. deepseek-ai/deepseek-v3).",
     )
     p.add_argument("--gemini-model", default=GEMINI_MODEL, help="Gemini model name")
+    p.add_argument(
+        "--lang",
+        default=CONTENT_LANG,
+        help="Language for all generated metadata: titles, captions, hashtags and thumbnail "
+             "(e.g. en, pt-BR, es). Default: en",
+    )
     p.add_argument(
         "--gemini-fallback-model",
         default=GEMINI_FALLBACK_MODEL,
@@ -530,6 +556,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Face jump snap threshold (default: 0.25)",
+    )
+    p.add_argument(
+        "--track-hold",
+        type=float,
+        default=None,
+        help="Minimum seconds the camera stays on a face after a cut before it can cut again (default: 2.0)",
     )
     p.add_argument(
         "--track-conf",
@@ -862,6 +894,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         silence_trim=args.silence_trim,
         use_broll=not args.no_broll,
         use_hook_glitch=not args.no_hook,
+        hook_transition=args.hook_transition,
         use_auto_bgm=not args.no_bgm,
         use_karaoke_effect=not args.no_karaoke,
         use_split_screen=args.split_screen,
@@ -878,6 +911,8 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         # Subtitle & Tipografi
         no_subs=args.no_subs,
         active_font_style=args.font_style,
+        caption_style=args.caption_style,
+        caption_color=args.caption_color,
         font_list=FONT_LIST,
         use_advanced_text=args.advanced_text,
         use_advanced_text_on_hook=args.advanced_text_hook,
@@ -910,6 +945,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),
         nvidia_model=args.nvidia_model,
         gemini_model=args.gemini_model,
+        content_lang=args.lang,
         gemini_fallback_model=args.gemini_fallback_model,
         load_gemini_json=args.load_gemini_json,
         # Tracking Tuning
@@ -918,6 +954,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         track_smooth=args.track_smooth,
         track_jitter=args.track_jitter,
         track_snap=args.track_snap,
+        track_hold=args.track_hold,
         track_conf=args.track_conf,
         track_smooth_window=args.track_smooth_window,
         scene_cut_threshold=args.scene_cut_threshold,

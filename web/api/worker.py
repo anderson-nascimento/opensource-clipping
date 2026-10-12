@@ -342,8 +342,8 @@ def _run_pipeline_sync(job_id: str, payload: dict) -> None:
                 ClipDetail(
                     rank=entry.get("rank", 0),
                     viral_score=entry.get("viral_score"),
-                    title=entry.get("title_indonesian", ""),
-                    title_en=entry.get("title_english", ""),
+                    title=entry.get("title", ""),
+                    title_en=entry.get("title", ""),
                     filename=filename,
                     duration=entry.get("duration"),
                     start_time=entry.get("start_time"),

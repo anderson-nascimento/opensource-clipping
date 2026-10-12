@@ -86,17 +86,6 @@ def _build_tiktok_caption(caption, hashtags):
     return caption or hashtags
 
 
-def _looks_indonesian(text):
-    text = f" {_normalize_spaces(text).lower()} "
-    indicators = [
-        " yang ", " dan ", " untuk ", " dengan ", " karena ", " adalah ",
-        " bisa ", " tidak ", " lebih ", " dalam ", " pada ", " agar ",
-        " dari ", " ini ", " itu ", " juga ", " kalau ", " saat ",
-        " tentang ", " bikin ", " banget ", " jadi ", " sudah ",
-    ]
-    return any(w in text for w in indicators)
-
-
 # Field names used by older versions (Indonesian). Saved AI responses
 # (--load-gemini) and older manifests still use them, so they are migrated
 # to the current English names before anything else reads the item.
@@ -139,6 +128,12 @@ def migrate_legacy_keys(item: dict) -> dict:
         _rename_keys(plan, _LEGACY_TYPOGRAPHY_KEYS)
         if isinstance(plan, dict) and plan.get("style") in _LEGACY_STYLE_VALUES:
             plan["style"] = _LEGACY_STYLE_VALUES[plan["style"]]
+
+    # v2.x produced fixed English + Indonesian fields; v3 uses one language.
+    if not item.get("title"):
+        item["title"] = item.get("title_english") or item.get("title_indonesian") or ""
+    if not item.get("tiktok_title"):
+        item["tiktok_title"] = item.get("tiktok_title_id") or ""
     return item
 
 
@@ -191,13 +186,11 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
         if not isinstance(item.get("hook"), dict):
             item["hook"] = {"text": str(item.get("hook", "")), "start_time": item["start_time"], "end_time": item["start_time"] + 3.0}
 
-        item["title_indonesian"] = _trim_title(item.get("title_indonesian", ""))
-        item["title_english"] = _trim_title(item.get("title_english", ""))
+        item["title"] = _trim_title(item.get("title", ""))
         item["description_hook"] = _normalize_spaces(item.get("description_hook", ""))
         item["description_context"] = _normalize_spaces(item.get("description_context", ""))
         item["hashtags"] = _normalize_spaces(item.get("hashtags") or item.get("hashtag") or "")
-        item["tiktok_title_id"] = _normalize_spaces(item.get("tiktok_title_id", ""))
-        item["tiktok_caption_id"] = _normalize_spaces(item.get("tiktok_caption_id", ""))
+        item["tiktok_title"] = _normalize_spaces(item.get("tiktok_title", ""))
         item["tiktok_caption"] = _normalize_spaces(item.get("tiktok_caption", ""))
         item["keyword_tags"] = _normalize_keyword_tags(item.get("keyword_tags", []))
 
@@ -205,7 +198,7 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
         item["hashtags"] = hashtags_clean
 
         # Enriched fields
-        item["youtube_title_final"] = item["title_english"]
+        item["youtube_title_final"] = item["title"]
         item["youtube_description_final"] = _build_youtube_description(
             item.get("description_hook", ""),
             item.get("description_context", ""),
@@ -213,31 +206,18 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
             source_url=item.get("source_url"),
         )
         item["youtube_tags_final"] = item.get("keyword_tags", [])
-
-        # TikTok EN (existing behavior)
+        item["tiktok_title_final"] = item.get("tiktok_title", "") or item["title"]
         item["tiktok_caption_final"] = _build_tiktok_caption(
             item.get("tiktok_caption", ""),
             item.get("hashtags", ""),
         )
 
-        # TikTok ID (new fields)
-        item["tiktok_title_id_final"] = item.get("tiktok_title_id", "") or item.get("title_indonesian", "")
-        item["tiktok_caption_id_final"] = _build_tiktok_caption(
-            item.get("tiktok_caption_id", ""),
-            item.get("hashtags", ""),
-        )
-
         # --- Warnings ---
         warning = []
-        if not item["title_indonesian"]:
-            warning.append("title_indonesian is empty")
-        if len(item["title_indonesian"]) > 100:
-            warning.append("title_indonesian > 100 characters")
-
-        if not item["title_english"]:
-            warning.append("title_english is empty")
-        if len(item["title_english"]) > 100:
-            warning.append("title_english > 100 characters")
+        if not item["title"]:
+            warning.append("title is empty")
+        if len(item["title"]) > 100:
+            warning.append("title > 100 characters")
 
         if hashtag_count < 2 or hashtag_count > 3:
             warning.append("hashtag count is not 2-3")
@@ -249,10 +229,8 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
         if len(item["keyword_tags"]) < 5:
             warning.append("too few keyword_tags")
 
-        if not item["tiktok_title_id"]:
-            warning.append("tiktok_title_id is empty")
-        if not item["tiktok_caption_id"]:
-            warning.append("tiktok_caption_id is empty")
+        if not item["tiktok_title"]:
+            warning.append("tiktok_title is empty")
         if not item["tiktok_caption"]:
             warning.append("tiktok_caption is empty")
 
@@ -260,20 +238,6 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
         yt_desc = item.get("youtube_description_final", "")
         if len(yt_desc) < 30:
             warning.append("youtube_description too short (< 30 characters) — looks like spam")
-
-        if _looks_indonesian(item["title_english"]):
-            warning.append("title_english detected as not fully English")
-        if _looks_indonesian(item["description_hook"]):
-            warning.append("description_hook detected as not fully English")
-        if _looks_indonesian(item["description_context"]):
-            warning.append("description_context detected as not fully English")
-        if _looks_indonesian(item["tiktok_caption"]):
-            warning.append("tiktok_caption detected as not fully English")
-
-        if item["tiktok_title_id"] and not _looks_indonesian(item["tiktok_title_id"]):
-            warning.append("tiktok_title_id detected as not Indonesian")
-        if item["tiktok_caption_id"] and not _looks_indonesian(item["tiktok_caption_id"]):
-            warning.append("tiktok_caption_id detected as not Indonesian")
 
         if warning:
             all_warnings.append((rank, warning))
@@ -294,9 +258,7 @@ def normalize_and_validate(ai_clips: list[dict]) -> list[dict]:
             "viral_score": item.get("viral_score", 0),
             "duration": round(float(item.get("end_time", 0)) - float(item.get("start_time", 0)), 2),
             "target_account": classification.get("target_account", ""),
-            "title_indonesian": item["title_indonesian"],
-            "title_english": item["title_english"],
-            "tiktok_title_id": item["tiktok_title_id"],
+            "title": item["title"],
             "hashtags": item["hashtags"],
             "warnings": item.pop("_warnings_temp", "OK"),
         })
@@ -311,9 +273,8 @@ def print_preview(ai_clips: list[dict]) -> None:
     print("- youtube_title_final")
     print("- youtube_description_final")
     print("- youtube_tags_final")
+    print("- tiktok_title_final")
     print("- tiktok_caption_final")
-    print("- tiktok_title_id_final")
-    print("- tiktok_caption_id_final")
     print()
 
     print("===== PER-CLIP DETAIL PREVIEW =====")
@@ -322,16 +283,14 @@ def print_preview(ai_clips: list[dict]) -> None:
         print(f"\n--- Rank {item['rank']} (Viral Score: {item.get('viral_score', '?')}) ---")
         print(f"Target Account    : {classification.get('target_account', '')} ({classification.get('account_type', '')})")
         print(f"Account Reason    : {classification.get('reason', '')}")
-        print(f"Title ID          : {item['title_indonesian']}")
-        print(f"Title EN          : {item['title_english']}")
-        print(f"TikTok Title ID   : {item.get('tiktok_title_id_final', '')}")
+        print(f"Title             : {item['title']}")
+        print(f"TikTok Title      : {item.get('tiktok_title_final', '')}")
         print(f"Hashtag           : {item['hashtags']}")
         print(f"Hook Desc         : {item['description_hook']}")
         print(f"Ctx Desc          : {item['description_context']}")
         print(f"YT Desc           : {item['youtube_description_final']}")
         print(f"YT Tags           : {item['youtube_tags_final']}")
-        print(f"TikTok EN         : {item['tiktok_caption_final']}")
-        print(f"TikTok Caption ID : {item.get('tiktok_caption_id_final', '')}")
+        print(f"TikTok Caption    : {item['tiktok_caption_final']}")
 
 
 def save_metadata_preview(ai_clips: list[dict], path: str = "metadata_preview.json") -> None:

@@ -47,6 +47,27 @@ _get_render_dims = utils._get_render_dims
 _is_vertical_ratio = utils._is_vertical_ratio
 RATIO_MAP = utils.RATIO_MAP
 
+def _prepare_flash_video(out_w, out_h, video_encoder, duration=0.15):
+    """Generate a short, silent white flash used between the hook teaser and the clip."""
+    flash_ts = f"flash_ready_{out_w}x{out_h}.ts"
+    if os.path.exists(flash_ts):
+        return flash_ts
+    cmd = (
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi",
+            "-i", f"color=c=white:s={out_w}x{out_h}:d={duration}:r=30",
+            "-f", "lavfi",
+            "-i", "anullsrc=r=48000:cl=stereo",
+            "-t", str(duration),
+        ]
+        + get_ts_encode_args(video_encoder, fps=30)
+        + [flash_ts]
+    )
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return flash_ts
+
+
 def prepare_glitch_video(ratio, cfg, video_encoder, source_h=1080, custom_dims=None):
     """
     Generate a 1-second VHS glitch transition video.
@@ -69,6 +90,9 @@ def prepare_glitch_video(ratio, cfg, video_encoder, source_h=1080, custom_dims=N
         out_w, out_h = custom_dims
     else:
         out_w, out_h = _get_render_dims(cfg, ratio, source_h=source_h)
+
+    if getattr(cfg, "hook_transition", "flash") == "flash":
+        return _prepare_flash_video(out_w, out_h, video_encoder)
 
     # Use dimensions in filename to allow multiple cached versions
     glitch_ts = f"glitch_ready_{out_w}x{out_h}.ts"

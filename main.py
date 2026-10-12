@@ -42,7 +42,7 @@ def _print_banner(cfg, version, url, idx=None, total=None):
     print(f"   Font Style  : {cfg.active_font_style}")
     print(f"   Subtitles   : {'OFF' if cfg.no_subs else 'ON'}")
     print(f"   B-Roll      : {'ON' if cfg.use_broll else 'OFF'}")
-    print(f"   Hook Glitch : {'ON' if cfg.use_hook_glitch else 'OFF'}")
+    print(f"   Hook        : {cfg.hook_transition.upper() if cfg.use_hook_glitch else 'OFF'}")
     print(f"   BGM         : {'ON' if cfg.use_auto_bgm else 'OFF'}")
     print(f"   Karaoke     : {'ON' if cfg.use_karaoke_effect else 'OFF'}")
     print(f"   Split-Screen: {'ON' if cfg.use_split_screen else 'OFF'}")
@@ -51,6 +51,7 @@ def _print_banner(cfg, version, url, idx=None, total=None):
         print(f"   Split Trigger: {cfg.split_trigger}")
     print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
     print(f"   Gemini      : {cfg.gemini_model}")
+    print(f"   Language    : {cfg.content_lang}")
     if getattr(cfg, "watermark_enabled", False):
         wm_type = "Text" if cfg.watermark_text else "Image"
         wm_content = cfg.watermark_text or cfg.watermark_image or "-"

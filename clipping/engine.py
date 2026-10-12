@@ -489,9 +489,9 @@ def _build_account_classification_prompt() -> str:
 
 
 # ---- Retry Config ----
-MAX_ATTEMPTS = 10
-INITIAL_WAIT_SECONDS = 60
-WAIT_INCREMENT_SECONDS = 30
+MAX_ATTEMPTS = 4
+INITIAL_WAIT_SECONDS = 20
+WAIT_INCREMENT_SECONDS = 20
 REQUEST_TIMEOUT_MS = 15 * 60 * 1000  # 15 menit
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 
@@ -588,6 +588,24 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
     ) from last_exc
 
 
+# Language used for all generated metadata (titles, captions, hashtags, thumbnail).
+LANGUAGE_NAMES = {
+    "en": "US English",
+    "pt-BR": "Brazilian Portuguese",
+    "pt": "European Portuguese",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "id": "Indonesian",
+}
+
+
+def language_name(code: str) -> str:
+    """Return a human-readable language name for the prompt (falls back to the code itself)."""
+    return LANGUAGE_NAMES.get(code, code)
+
+
 # ==== KONFIGURASI DURASI KLIP ====
 # Ubah nilai di bawah ini jika ingin mengganti batas durasi klip (dalam detik)
 MIN_CLIP_DURATION = 20
@@ -595,6 +613,7 @@ MAX_CLIP_DURATION = 179
 
 def get_analysis_prompt(full_transcript: str, num_clips: int, hook_duration: int, cfg=None) -> str:
     """Centralized prompt for both Gemini and NVIDIA providers."""
+    language = language_name(getattr(cfg, "content_lang", "en") if cfg else "en")
     # Build optional Hook V2 prompt section
     _hook_v2_prompt = ""
     if cfg and getattr(cfg, "hook_v2", False):
@@ -759,37 +778,25 @@ SELECTION REASON:
 - Explain why this clip stays interesting even when watched without the full video's context.
 
 METADATA LANGUAGE RULES:
-- title_indonesian is still required for internal compatibility / fallback.
-- title_indonesian MUST be in natural Indonesian and at most 100 characters.
-- All main cross-platform metadata must be in natural English.
-- This applies to:
-  - title_english
+- ALL metadata fields MUST be written in natural {language}:
+  - title
+  - tiktok_title
+  - tiktok_caption
   - hashtags
   - description_hook
   - description_context
   - keyword_tags
-  - tiktok_caption
-- Specifically for the Indonesian TikTok version, also create:
-  - tiktok_title_id
-  - tiktok_caption_id
-- tiktok_title_id and tiktok_caption_id MUST be in natural Indonesian.
-- tiktok_title_id must be more descriptive than title_indonesian, may be longer than 100 characters if needed, and must clearly explain what the clip/video is about.
-- tiktok_caption_id must be natural, informative, suitable for an Indonesian audience, and may be a bit longer if that helps explain the clip.
-- Do not mix Indonesian and English within the same field.
-- Use English that is natural, concise, easy to read, and suitable for short-form content.
+- The only exception is search_query (B-roll), which stays in English.
+- Do not mix languages within the same field.
+- Use language that is natural, concise, easy to read, and suitable for short-form content.
 - Avoid stiff literal translations.
 
 CROSS-PLATFORM METADATA:
-For each clip, produce the following metadata:
+For each clip, produce the following metadata (all in {language}):
 
-1. title_indonesian
-- Natural, short, and relevant Indonesian.
-- This is only for internal compatibility / fallback.
-- At most 100 characters.
-
-2. title_english
-- Natural, strong, sharp, and easy-to-read English.
-- This is the main title for platform metadata.
+1. title
+- The main title, used for YouTube, the thumbnail, and the other platforms.
+- Natural, strong, sharp, and easy to read.
 - At most 100 characters.
 - Focus on 1 main idea.
 - Relevant to the clip's content, not the full video in general.
@@ -798,57 +805,42 @@ For each clip, produce the following metadata:
 - Avoid excessive punctuation like !!! ??? ...
 - Do not be too generic.
 
-3. hashtags
+2. hashtags
 - Fill with only 2 to 3 hashtags in a single string.
-- All hashtags MUST be in English.
 - Separate them with spaces.
 - Must be directly relevant to the clip's topic.
 - No duplicates.
 - Avoid overly generic hashtags like #fyp #viral #trending unless they are truly very relevant.
 - Use a format like: #mindset #career #productivity
 
-4. description_hook
+3. description_hook
 - Exactly 1 sentence.
-- MUST be in English.
 - This is the opening sentence of the metadata.
 - Must be short, strong, and spark curiosity.
 - No fake clickbait.
 
-5. description_context
+4. description_context
 - Exactly 1 sentence.
-- MUST be in English.
 - Concisely explains the main context of the clip.
 - Must be relevant to what is said in the clip.
 
-6. keyword_tags
+5. keyword_tags
 - Contains 5 to 8 short keywords.
-- MUST be in English.
 - Not hashtags.
 - Must be a list of short phrases relevant to the clip's content.
 - Avoid keyword spam.
 - Prioritize keywords that people would actually search for.
 - This field is mainly for YouTube metadata.
 
-7. tiktok_title_id
-- Natural Indonesian.
-- Longer and more descriptive of the video's content than title_indonesian.
+6. tiktok_title
+- Longer and more descriptive of the video's content than title.
 - Does not need to be limited to 100 characters, but must still be concise, clear, and easy to read.
 - Must be relevant to the clip's content, not the long video in general.
 - No cheap clickbait.
 
-8. tiktok_caption_id
-- 1 to 2 sentences.
-- MUST be in Indonesian.
-- May be a bit longer than the English caption if that helps explain the clip.
-- Natural, light, and easy-to-read style.
-- Stay true to the clip's content.
-- Do not just copy-paste the title.
-- Do not be too formal.
-
-9. tiktok_caption
+7. tiktok_caption
 - 1 to 2 short sentences.
-- MUST be in English.
-- A more natural, light, and conversational style.
+- A natural, light, and conversational style.
 - Stay true to the clip's content.
 - Do not just copy-paste the title.
 - Do not be too formal.
@@ -860,8 +852,6 @@ METADATA QUALITY RULES:
 - Do not use fake hyperbole like "100% guaranteed", "you'll definitely get rich", etc. unless it is very clearly stated.
 - If there are numbers, strong phrases, or sharp statements in the original speech, prioritize them as inspiration for the title/caption.
 - Title, descriptions, and caption must complement each other, not repeat the same sentence.
-- All metadata fields used for platforms must be in natural English, not stiff literal translations.
-- Specifically for tiktok_title_id and tiktok_caption_id, use natural, clear Indonesian that better explains the clip for an Indonesian audience.
 
 OUTPUT RULES:
 - The output MUST be a valid JSON array.
@@ -894,14 +884,12 @@ REQUIRED JSON STRUCTURE (follow these field names strictly):
       {{ "start_time": 30.5, "end_time": 55.0 }},
       {{ "start_time": 58.0, "end_time": 90.0 }}
     ],
-    "title_indonesian": "...",
-    "title_english": "...",
+    "title": "...",
     "hashtags": "#hashtag1 #hashtag2",
     "description_hook": "...",
     "description_context": "...",
     "keyword_tags": ["tag1", "tag2"],
-    "tiktok_title_id": "...",
-    "tiktok_caption_id": "...",
+    "tiktok_title": "...",
     "tiktok_caption": "...",
     "reason": "...",
     "account_classification": {{
@@ -999,8 +987,7 @@ def analyze_with_nvidia(full_transcript: str, cfg) -> list[dict]:
                         "required": ["broll_idea", "search_keyword", "why_it_works"]
                     }
                 },
-                "title_indonesian": {"type": "string"},
-                "title_english": {"type": "string"},
+                "title": {"type": "string"},
                 "hashtags": {"type": "string"},
                 "description_hook": {"type": "string"},
                 "description_context": {"type": "string"},
@@ -1008,8 +995,7 @@ def analyze_with_nvidia(full_transcript: str, cfg) -> list[dict]:
                     "type": "array",
                     "items": {"type": "string"}
                 },
-                "tiktok_title_id": {"type": "string"},
-                "tiktok_caption_id": {"type": "string"},
+                "tiktok_title": {"type": "string"},
                 "tiktok_caption": {"type": "string"},
                 "reason": {"type": "string"},
                 "account_classification": {
@@ -1083,9 +1069,9 @@ def analyze_with_nvidia(full_transcript: str, cfg) -> list[dict]:
             },
             "required": [
                 "rank", "viral_score", "start_time", "end_time", "hook_start_time", "hook_end_time",
-                "bgm_mood", "typography_plan", "broll_list", "recommended_visual_broll_hook", "title_indonesian",
-                "title_english", "hashtags", "description_hook", "description_context",
-                "keyword_tags", "tiktok_title_id", "tiktok_caption_id", "tiktok_caption",
+                "bgm_mood", "typography_plan", "broll_list", "recommended_visual_broll_hook", "title",
+                "hashtags", "description_hook", "description_context",
+                "keyword_tags", "tiktok_title", "tiktok_caption",
                 "reason", "account_classification", "hook_v2", "keep_segments"
             ]
         }
@@ -1253,8 +1239,7 @@ def analyze_with_gemini(
                     "recommended_visual_broll_hook": schema_visual_broll_hook,
                     "reason": {"type": "STRING"},
                     "bgm_mood": {"type": "STRING"},
-                    "title_indonesian": {"type": "STRING"},
-                    "title_english": {"type": "STRING"},
+                    "title": {"type": "STRING"},
                     "hashtags": {"type": "STRING"},
                     "description_hook": {"type": "STRING"},
                     "description_context": {"type": "STRING"},
@@ -1262,8 +1247,7 @@ def analyze_with_gemini(
                         "type": "ARRAY",
                         "items": {"type": "STRING"},
                     },
-                    "tiktok_title_id": {"type": "STRING"},
-                    "tiktok_caption_id": {"type": "STRING"},
+                    "tiktok_title": {"type": "STRING"},
                     "tiktok_caption": {"type": "STRING"},
                     "account_classification": classification_schema,
                     "hook_v2": {
@@ -1308,10 +1292,9 @@ def analyze_with_gemini(
                     "rank", "viral_score", "hook_start_time", "hook_end_time",
                     "start_time", "end_time", "typography_plan",
                     "broll_list", "recommended_visual_broll_hook", "reason", "bgm_mood",
-                    "title_indonesian", "title_english", "hashtags",
+                    "title", "hashtags",
                     "description_hook", "description_context",
-                    "keyword_tags", "tiktok_title_id",
-                    "tiktok_caption_id", "tiktok_caption",
+                    "keyword_tags", "tiktok_title", "tiktok_caption",
                     "account_classification", "hook_v2", "keep_segments",
                 ],
             },

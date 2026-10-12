@@ -89,15 +89,15 @@ function NewJob() {
     setError('')
 
     if (mode === 'url' && !url.trim()) {
-      setError('URL tidak boleh kosong')
+      setError('URL cannot be empty')
       return
     }
     if (mode === 'upload' && !uploadFilename) {
-      setError('Silakan upload video terlebih dahulu')
+      setError('Please upload a video first')
       return
     }
     if (mode === 'reuse' && !reuseJobId.trim()) {
-      setError('Job ID tidak boleh kosong')
+      setError('Job ID cannot be empty')
       return
     }
 
@@ -138,7 +138,7 @@ function NewJob() {
       <div className="page-header">
         <div>
           <h2>New Clipping Job</h2>
-          <p>Generate viral short clips dari video panjang</p>
+          <p>Generate viral short clips from long videos</p>
         </div>
       </div>
 
@@ -240,7 +240,7 @@ function NewJob() {
                 value={reuseJobId}
                 onChange={(e) => setReuseJobId(e.target.value)}
               />
-              <p className="form-hint" style={{ marginTop: '4px' }}>Bypass download dengan job ID lama. (Jika menggunakan Clone & Rerun, biarkan form ini terisi).</p>
+              <p className="form-hint" style={{ marginTop: '4px' }}>Bypass download using an existing job ID. (If using Clone & Rerun, leave this field filled in).</p>
             </div>
           )}
         </div>

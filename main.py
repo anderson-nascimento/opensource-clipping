@@ -37,9 +37,9 @@ def _print_banner(cfg, version, url, idx=None, total=None):
     print("=" * 70)
     print(f"   Source      : {platform_label}")
     print(f"   URL         : {url}")
-    print(f"   Jumlah Clip : {cfg.jumlah_clip}")
-    print(f"   Rasio       : {cfg.pilihan_rasio}")
-    print(f"   Font Style  : {cfg.gaya_font_aktif}")
+    print(f"   Clips       : {cfg.num_clips}")
+    print(f"   Ratio       : {cfg.aspect_ratio}")
+    print(f"   Font Style  : {cfg.active_font_style}")
     print(f"   Subtitles   : {'OFF' if cfg.no_subs else 'ON'}")
     print(f"   B-Roll      : {'ON' if cfg.use_broll else 'OFF'}")
     print(f"   Hook Glitch : {'ON' if cfg.use_hook_glitch else 'OFF'}")
@@ -67,7 +67,7 @@ def _print_banner(cfg, version, url, idx=None, total=None):
 
 def _cleanup_source_video(cfg):
     """Remove downloaded source video and associated subtitle files to free disk."""
-    video_path = cfg.file_video_asli
+    video_path = cfg.original_video_file
     if os.path.exists(video_path):
         size_mb = os.path.getsize(video_path) / (1024 * 1024)
         os.remove(video_path)
@@ -120,20 +120,20 @@ def main():
         print("=" * 70)
         print(f"   Recipe      : {cfg.story_recipe_path}")
         print(f"   Sources     : {cfg.sources_json_path}")
-        print(f"   Rasio       : {cfg.pilihan_rasio}")
+        print(f"   Ratio       : {cfg.aspect_ratio}")
         print(f"   Output Dir  : {cfg.story_output_dir}")
         print(f"   Skip DL     : {'YES' if cfg.skip_download else 'NO'}")
         print("=" * 70)
 
         run_story_pipeline(cfg)
 
-        print("\n✅ Selesai! Semua story clips telah dirender.")
+        print("\n✅ Done! All story clips have been rendered.")
         return
 
     # ── Normal Auto-Clip Mode ────────────────────────────────────────
     if not cfg.api_key_gemini:
-        print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
-        print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
+        print("❌ ERROR: GOOGLE_API_KEY environment variable not found.")
+        print("   Set via: export GOOGLE_API_KEY='your-key' or create a .env file")
         sys.exit(1)
 
     url_list = getattr(cfg, "url_list", [cfg.url_youtube] if isinstance(cfg.url_youtube, str) else cfg.url_youtube)
@@ -142,7 +142,7 @@ def main():
     # ── Single URL Mode (backward-compatible) ────────────────────────
     if not is_batch:
         _run_single_url(cfg, url_list[0], version)
-        print("\n✅ Selesai! Semua klip telah dirender.")
+        print("\n✅ Done! All clips have been rendered.")
         return
 
     # ── Batch Multi-URL Mode ─────────────────────────────────────────
@@ -190,7 +190,7 @@ def main():
         os.makedirs(url_cfg.outputs_dir, exist_ok=True)
 
         # Isolate downloaded video file per URL
-        url_cfg.file_video_asli = os.path.join(url_cfg.outputs_dir, "video_asli.mp4")
+        url_cfg.original_video_file = os.path.join(url_cfg.outputs_dir, "original_video.mp4")
 
         print(f"\n{'━' * 70}")
         print(f"📹 [{idx + 1}/{total}] Processing: {url}")
@@ -220,7 +220,7 @@ def main():
                 "duration_seconds": round(elapsed, 1),
                 "manifest": manifest,
             })
-            print(f"\n✅ [{idx + 1}/{total}] Selesai — {clip_count} clip(s) rendered in {elapsed:.0f}s")
+            print(f"\n✅ [{idx + 1}/{total}] Done — {clip_count} clip(s) rendered in {elapsed:.0f}s")
 
         except Exception as e:
             elapsed = time.time() - t_start
@@ -236,8 +236,8 @@ def main():
                 "duration_seconds": round(elapsed, 1),
                 "manifest": None,
             })
-            print(f"\n❌ [{idx + 1}/{total}] GAGAL — {error_msg}")
-            print(f"   ⏭️ Melanjutkan ke URL berikutnya...")
+            print(f"\n❌ [{idx + 1}/{total}] FAILED — {error_msg}")
+            print(f"   ⏭️ Moving on to the next URL...")
 
     # ── Batch Summary ────────────────────────────────────────────────
     total_elapsed = time.time() - t_batch_start

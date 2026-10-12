@@ -66,7 +66,7 @@ function Settings() {
       if (nvidiaKey) payload.nvidia_api_key = nvidiaKey
 
       if (Object.keys(payload).length === 0) {
-        setMsg('Tidak ada perubahan')
+        setMsg('No changes')
         setSaving(false)
         return
       }
@@ -77,9 +77,9 @@ function Settings() {
       setPexelsKey('')
       setHfToken('')
       setNvidiaKey('')
-      setMsg('✅ Settings berhasil diperbarui!')
+      setMsg('✅ Settings updated successfully!')
     } catch (err) {
-      setMsg('❌ Gagal menyimpan: ' + err.message)
+      setMsg('❌ Failed to save: ' + err.message)
     } finally {
       setSaving(false)
     }
@@ -92,7 +92,7 @@ function Settings() {
       <div className="page-header">
         <div>
           <h2>Settings</h2>
-          <p>Konfigurasi API keys dan default settings</p>
+          <p>Configure API keys and default settings</p>
         </div>
       </div>
 

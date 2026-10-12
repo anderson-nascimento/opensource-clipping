@@ -74,7 +74,7 @@ async def upload_video(file: UploadFile = File(...)) -> dict:
     return {
         "filename": safe_name,
         "size_mb": round(size_mb, 2),
-        "message": f"Upload berhasil: {safe_name} ({size_mb:.1f} MB)",
+        "message": f"Upload succeeded: {safe_name} ({size_mb:.1f} MB)",
     }
 
 

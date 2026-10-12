@@ -55,12 +55,12 @@ crop_center_broll = broll.crop_center_broll
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
 
-def buat_video_hybrid(
+def create_hybrid_video(
     input_video,
     output_video,
     start_clip,
     end_clip,
-    rasio,
+    ratio,
     cfg,
     broll_data=None,
     label="Hybrid",
@@ -94,9 +94,9 @@ def buat_video_hybrid(
     # =======================================================
     # 🎛️ PARAMETER TUNING KAMERA
     # =======================================================
-    STEP_DETEKSI     = cfg.track_step if cfg.track_step is not None else 0.25   # AI mengecek wajah tiap 0.25 detik
-    # STEP_DETEKSI     = 0.5   # AI mengecek wajah tiap 0.5 detik
-    # STEP_DETEKSI     = max(0.5, (end_clip - start_clip) / 60.0)   # [OLD] AI mengecek wajah tiap max 0.5 atau sepanjang durasi (end_clip - start_clip) detik per menit
+    DETECTION_STEP     = cfg.track_step if cfg.track_step is not None else 0.25   # AI mengecek wajah tiap 0.25 detik
+    # DETECTION_STEP     = 0.5   # AI mengecek wajah tiap 0.5 detik
+    # DETECTION_STEP     = max(0.5, (end_clip - start_clip) / 60.0)   # [OLD] AI mengecek wajah tiap max 0.5 atau sepanjang durasi (end_clip - start_clip) detik per menit
 
     DEADZONE_RATIO   = cfg.track_deadzone if cfg.track_deadzone is not None else 0.15  # 15% area tengah adalah zona aman (kamera tidak ikut gerak)
     # DEADZONE_RATIO   = 0.25  # 25% area tengah adalah zona aman (kamera tidak ikut gerak)
@@ -119,7 +119,7 @@ def buat_video_hybrid(
     detector = None
     if cfg.face_detector == "yolo":
         if not os.path.exists(cfg.file_yolo_model):
-            print(f"   📥 Mendownload YOLOv8 Face Model ({cfg.yolo_size})...")
+            print(f"   📥 Downloading YOLOv8 Face Model ({cfg.yolo_size})...")
             import urllib.request
 
             urllib.request.urlretrieve(cfg.url_yolo_model, cfg.file_yolo_model)
@@ -138,8 +138,8 @@ def buat_video_hybrid(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Dynamic crop dimensions based on target ratio
-    w_part, h_part = RATIO_MAP.get(rasio, (16, 9))
-    if _is_vertical_ratio(rasio):
+    w_part, h_part = RATIO_MAP.get(ratio, (16, 9))
+    if _is_vertical_ratio(ratio):
         crop_w = int(height * w_part / h_part)
         crop_h = height
     else:
@@ -165,12 +165,12 @@ def buat_video_hybrid(
     current_time = 0.0
     last_detect_percent = -1
     
-    skip_tracking = getattr(cfg, "static_crop", False) and rasio in ["1:1", "3:4", "4:5"]
+    skip_tracking = getattr(cfg, "static_crop", False) and ratio in ["1:1", "3:4", "4:5"]
 
     if skip_tracking:
-        print(f"🧠 {label} - Static Crop aktif (tanpa face tracking)...", flush=True)
+        print(f"🧠 {label} - Static Crop active (no face tracking)...", flush=True)
     else:
-        print(f"🧠 {label} - Analisa wajah dimulai...", flush=True)
+        print(f"🧠 {label} - Face analysis started...", flush=True)
 
     while current_time <= duration and not skip_tracking:
         cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
@@ -226,10 +226,10 @@ def buat_video_hybrid(
             min(100, int((current_time / duration) * 100)) if duration > 0 else 100
         )
         if detect_percent != last_detect_percent:
-            print(f"⏳ {label} - Analisa wajah: {detect_percent:3d}%", flush=True)
+            print(f"⏳ {label} - Face analysis: {detect_percent:3d}%", flush=True)
             last_detect_percent = detect_percent
 
-        current_time += STEP_DETEKSI
+        current_time += DETECTION_STEP
 
     # FASE 2: SMOOTH CAMERA
     smooth_data = []
@@ -318,10 +318,10 @@ def buat_video_hybrid(
         return f"{mins:02d}:{secs:02d}"
 
     # FASE 3: RENDER FRAME
-    base_out_w, base_out_h = _get_render_dims(cfg, rasio, source_h=height)
+    base_out_w, base_out_h = _get_render_dims(cfg, ratio, source_h=height)
     
     # DEV MODE: Force 16:9 to show context or 2648 ultrawide for merge
-    dev_visualize = cfg.dev_mode and _is_vertical_ratio(rasio)
+    dev_visualize = cfg.dev_mode and _is_vertical_ratio(ratio)
     merge_output = dev_visualize and getattr(cfg, "dev_mode_with_output_merge", False)
     
     if merge_output:
@@ -343,10 +343,10 @@ def buat_video_hybrid(
         frame_count = 0
         last_render_percent = -1
 
-        print(f"🎬 {label} - Render frame dimulai...", flush=True)
+        print(f"🎬 {label} - Render frame started...", flush=True)
 
         while True:
-            ret, frame_utama = cap.read()
+            ret, main_frame = cap.read()
             if not ret:
                 break
 
@@ -354,26 +354,26 @@ def buat_video_hybrid(
             if t > duration:
                 break
 
-            waktu_absolut = start_clip + t
+            absolute_time = start_clip + t
 
             # --- 1. ALWAYS CREATE CROPPED OUTPUT ---
-            if _is_vertical_ratio(rasio):
+            if _is_vertical_ratio(ratio):
                 # Vertical/square ratios: face-tracked crop
                 cx_base, cy_base = _get_pos(t)
                 x1_crop = int(max(0, min(cx_base - crop_w // 2, width - crop_w)))
                 y1_crop = int(max(0, min(cy_base - crop_h // 2, height - crop_h)))
-                cropped = frame_utama[y1_crop : y1_crop + crop_h, x1_crop : x1_crop + crop_w]
+                cropped = main_frame[y1_crop : y1_crop + crop_h, x1_crop : x1_crop + crop_w]
                 frame_normal = _resize_frame(cropped, (base_out_w, base_out_h))
             else:
                 # 16:9 landscape: fit-to-height with letterbox (no stretch)
                 cx_base, cy_base = default_cx, default_cy
-                src_h, src_w = frame_utama.shape[:2]
+                src_h, src_w = main_frame.shape[:2]
                 src_ratio = src_w / src_h
                 out_ratio = base_out_w / base_out_h
 
                 if abs(src_ratio - out_ratio) < 0.01:
                     # Source already matches target ratio — direct resize
-                    frame_normal = _resize_frame(frame_utama, (base_out_w, base_out_h))
+                    frame_normal = _resize_frame(main_frame, (base_out_w, base_out_h))
                 else:
                     # Fit source into target canvas, maintaining aspect ratio
                     frame_normal = np.zeros((base_out_h, base_out_w, 3), dtype=np.uint8)
@@ -383,7 +383,7 @@ def buat_video_hybrid(
                         fit_h = int(base_out_w / src_ratio)
                         if fit_h % 2 != 0:
                             fit_h += 1
-                        resized = _resize_frame(frame_utama, (fit_w, fit_h))
+                        resized = _resize_frame(main_frame, (fit_w, fit_h))
                         y_off = (base_out_h - fit_h) // 2
                         frame_normal[y_off : y_off + fit_h, :] = resized
                     else:
@@ -392,17 +392,17 @@ def buat_video_hybrid(
                         fit_w = int(base_out_h * src_ratio)
                         if fit_w % 2 != 0:
                             fit_w += 1
-                        resized = _resize_frame(frame_utama, (fit_w, fit_h))
+                        resized = _resize_frame(main_frame, (fit_w, fit_h))
                         x_off = (base_out_w - fit_w) // 2
                         frame_normal[:, x_off : x_off + fit_w] = resized
 
             # Base target for filtering (e.g. B-Roll applies to the normal output)
-            frame_terpilih = frame_normal
+            selected_frame = frame_normal
 
             # --- 2. CREATE DEV CONTEXT FRAME IF ACTIVE ---
             frame_dev = None
-            if dev_visualize and _is_vertical_ratio(rasio):
-                frame_base = _resize_frame(frame_utama, (1920, 1080))
+            if dev_visualize and _is_vertical_ratio(ratio):
+                frame_base = _resize_frame(main_frame, (1920, 1080))
                 frame_dev = (frame_base * 0.35).astype(np.uint8)
                 
                 scale_x = 1920 / width
@@ -443,7 +443,7 @@ def buat_video_hybrid(
                 hud_lines = [
                     f"MODE: HYBRID STANDARD (DEV)",
                     f"TIME: {format_seconds(t)}",
-                    f"LAYOUT: FULL {rasio}",
+                    f"LAYOUT: FULL {ratio}",
                     f"ANCHOR CX: {int(cx_base)}"
                 ]
                 for i, line in enumerate(hud_lines):
@@ -451,14 +451,14 @@ def buat_video_hybrid(
 
             # --- 3. B-ROLL OVERLAY OVER NORMAL FRAME ---
             for bc in broll_caps:
-                if bc["start"] <= waktu_absolut <= bc["end"]:
-                    elapsed_broll = waktu_absolut - bc["start"]
+                if bc["start"] <= absolute_time <= bc["end"]:
+                    elapsed_broll = absolute_time - bc["start"]
                     bc["cap"].set(cv2.CAP_PROP_POS_MSEC, elapsed_broll * 1000)
                     ret_b, frame_b = bc["cap"].read()
 
                     if ret_b:
-                        durasi_total_broll = bc["end"] - bc["start"]
-                        progress_broll = elapsed_broll / durasi_total_broll if durasi_total_broll > 0 else 0
+                        total_broll_duration = bc["end"] - bc["start"]
+                        progress_broll = elapsed_broll / total_broll_duration if total_broll_duration > 0 else 0
                         zoom_factor = 1.0 + ((MAX_ZOOM - 1.0) * progress_broll)
 
                         frame_b_crop = crop_center_broll(frame_b, base_out_w, base_out_h)
@@ -468,23 +468,23 @@ def buat_video_hybrid(
                         alpha = 1.0
                         if elapsed_broll < TRANSITION_DUR:
                             alpha = elapsed_broll / TRANSITION_DUR
-                        elif (bc["end"] - waktu_absolut) < TRANSITION_DUR:
-                            alpha = (bc["end"] - waktu_absolut) / TRANSITION_DUR
+                        elif (bc["end"] - absolute_time) < TRANSITION_DUR:
+                            alpha = (bc["end"] - absolute_time) / TRANSITION_DUR
 
                         if alpha >= 1.0:
-                            frame_terpilih = frame_b_zoomed
+                            selected_frame = frame_b_zoomed
                         else:
-                            frame_terpilih = cv2.addWeighted(frame_b_zoomed, alpha, frame_terpilih, 1.0 - alpha, 0)
+                            selected_frame = cv2.addWeighted(frame_b_zoomed, alpha, selected_frame, 1.0 - alpha, 0)
                     break
 
             # --- 4. WATERMARK OVERLAY ---
             if getattr(cfg, "watermark_enabled", False):
                 _wm_mod = _load_studio_internal_module("watermark.py", "clipping_studio_watermark")
-                frame_terpilih = _wm_mod.apply_watermark(frame_terpilih, cfg)
+                selected_frame = _wm_mod.apply_watermark(selected_frame, cfg)
 
             # --- 5. OUTPUT WRITING AND MERGING ---
             if merge_output:
-                frm_normal_small = _resize_frame(frame_terpilih, (608, 1080))
+                frm_normal_small = _resize_frame(selected_frame, (608, 1080))
                 frm_merged = np.full((1220, 2648, 3), 30, dtype=np.uint8)
                 
                 cv2.putText(frm_merged, "DIRECTOR'S CONSOLE (16:9 RAW)", (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
@@ -500,7 +500,7 @@ def buat_video_hybrid(
             elif dev_visualize:
                 writer.stdin.write(frame_dev.tobytes())
             else:
-                writer.stdin.write(frame_terpilih.tobytes())
+                writer.stdin.write(selected_frame.tobytes())
             frame_count += 1
 
             render_percent = (
@@ -519,9 +519,9 @@ def buat_video_hybrid(
         return_code = writer.wait()
 
         if return_code != 0:
-            raise RuntimeError(f"FFmpeg writer gagal: {stderr_data[-1000:]}")
+            raise RuntimeError(f"FFmpeg writer failed: {stderr_data[-1000:]}")
 
-        print(f"✅ {label} selesai.", flush=True)
+        print(f"✅ {label} done.", flush=True)
 
     finally:
         cap.release()

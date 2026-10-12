@@ -84,7 +84,7 @@ outputs/
     ├── render_manifest.json          # Manifest with metadata for all clips
     ├── metadata_preview.json         # Gemini-generated metadata
     ├── gemini_response.json          # Raw AI response (for debugging)
-    └── video_asli.mp4                # Downloaded source video
+    └── original_video.mp4            # Downloaded source video
 ```
 
 ---

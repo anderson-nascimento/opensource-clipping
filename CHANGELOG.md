@@ -8,6 +8,24 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [v2.0.0] - 2026-10-11
+
+### Changed (Breaking)
+- **English Codebase**: All user-facing logs, error messages, CLI validation messages and Web Studio / dashboard messages were translated from Indonesian to US English.
+- **English AI Prompts**: The Gemini/NVIDIA analysis prompt, the target account profiles and the voice-over prompt are now written in English. Fields meant for Indonesian audiences (`title_indonesian`, `tiktok_title_id`, `tiktok_caption_id`) are still generated in Indonesian.
+- **Renamed AI Response Keys**: `title_indonesia` → `title_indonesian`, `title_inggris` → `title_english`, `hastag` → `hashtags`, `alasan` → `reason`, `klasifikasi_akun` → `account_classification` (`tipe_akun` → `account_type`, `akun_tujuan` → `target_account`, `angle_utama` → `main_angle`, `kata_kunci_pendukung` → `supporting_keywords`, `bio_akun` → `account_bio`, `alternatif_akun` → `alternative_account`), and in `typography_plan`: `kata_utama` → `main_word`, `animasi` → `animation`, style values `utama`/`khusus` → `main`/`special`.
+- **Renamed Config Fields & Functions**: e.g. `jumlah_clip` → `num_clips`, `pilihan_rasio` → `aspect_ratio`, `durasi_hook` → `hook_duration`, `max_kata_per_subtitle` → `max_words_per_subtitle`, `gaya_font_aktif` → `active_font_style`, `daftar_font` → `font_list`, `file_video_asli` → `original_video_file`; `proses_klip` → `process_clip`, `buat_video_hybrid` → `create_hybrid_video`, `buat_file_ass` → `create_ass_file`, `siapkan_glitch_video` → `prepare_glitch_video`, among others. Custom code importing the old names must be updated.
+- **Source Video Filename**: The downloaded source video is now saved as `original_video.mp4` (was `video_asli.mp4`).
+
+### Added
+- **Legacy Key Migration**: Saved AI responses (`--load-gemini`) using the old Indonesian keys are migrated automatically. Uploaders still accept legacy title keys in older manifests, Web Studio reuses `video_asli.mp4` from older jobs, and `cleanup.sh` removes both filenames.
+- **Colab Notebook (T4 + Python 3.12)**: New `notebooks/Colab_T4_Py312.ipynb` (Brazilian Portuguese) that sets up a Python 3.12 venv with pip, FFmpeg, Deno, CUDA 12 libraries for faster-whisper, YouTube cookies and a GPU smoke test.
+
+### Fixed
+- **PyAV Compatibility**: Pinned `av<19`, since PyAV 19 removed the `metadata_errors` argument used by faster-whisper 1.2.x (`TypeError: open() got an unexpected keyword argument 'metadata_errors'`).
+
+---
+
 ## [v1.15.0] - 2026-09-26
 
 ### Added

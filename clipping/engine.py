@@ -107,14 +107,14 @@ def _ydl_progress_hook(d: dict) -> None:
             filled = int(20 * downloaded / total)
             bar = "█" * filled + " " * (20 - filled)
             print(
-                f"\r      Unduh: {pct:3.0f}%|{bar}| "
+                f"\r      Download: {pct:3.0f}%|{bar}| "
                 f"{downloaded / 1048576:.0f}/{total / 1048576:.0f}MB {spd} ETA {eta_s}   ",
                 end="", flush=True,
             )
         else:
             # Ukuran tidak diketahui (live/streamed manifest) — tampilkan byte + speed saja.
             print(
-                f"\r      Unduh: {downloaded / 1048576:.0f}MB {spd}   ",
+                f"\r      Download: {downloaded / 1048576:.0f}MB {spd}   ",
                 end="", flush=True,
             )
     elif status == "finished":

@@ -111,7 +111,8 @@ class JobCreateRequest(BaseModel):
 
     # AI
     ai_provider: AIProvider = AIProvider.GEMINI
-    gemini_model: str = "gemini-3-flash-preview"
+    gemini_model: str = "gemini-3.1-flash-lite"
+    content_lang: str = Field("en", description="Language for titles, captions, hashtags and thumbnail (e.g. en, pt-BR)")
     face_detector: FaceDetector = FaceDetector.MEDIAPIPE
 
 

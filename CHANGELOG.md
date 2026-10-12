@@ -22,6 +22,8 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 
 ### Fixed
 - **Camera Jumping Between Speakers**: When two faces had a similar size, the crop could jump side to side in under a second. A new face must now persist for 0.5s before a cut (applied from when it first appeared), and the camera holds for at least `--track-hold` seconds between cuts.
+- **Subtitle Rendering on Windows**: Every `subtitles=` filter failed on Windows paths (`C:\Users\...`) with `No option name near ...`, so no clip was rendered there. Filter paths now use forward slashes and are escaped for both FFmpeg parsing levels, which also covers quotes, commas, brackets and semicolons in paths.
+- **Leftover Indonesian Label**: The download progress bar still showed "Unduh"; it now reads "Download".
 
 ### Other
 - Renamed `notebooks/Quick_Start.ipynb` to `notebooks/OpenClippingQuickStart.ipynb`.

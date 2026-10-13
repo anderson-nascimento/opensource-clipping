@@ -192,6 +192,12 @@ def download_video(
             "progress_hooks": [_ydl_progress_hook],
         }
 
+    # On Windows, antivirus real-time scanning (e.g. Defender) briefly locks a freshly written
+    # file, and yt-dlp's default 3 instant retries fail the rename of a finished .part file
+    # (WinError 32). Retry for up to ~1 minute with growing waits instead.
+    ydl_opts["file_access_retries"] = 10
+    ydl_opts["retry_sleep_functions"] = {"file_access": lambda n: min(2 ** n, 10)}
+
     _apply_cookies(ydl_opts, yt_cookies)
 
     # --- Subtitle download — only supported for YouTube ---

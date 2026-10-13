@@ -309,7 +309,8 @@ def upload_video_to_youtube(
 
     title = (
         item.get("youtube_title_final")
-        or item.get("title_english")
+        or item.get("title")
+        or item.get("title_english")  # legacy manifests
         or item.get("title_inggris")  # legacy manifests
         or item.get("title_indonesian")
         or item.get("title_indonesia")  # legacy manifests

@@ -92,7 +92,7 @@ URL_YOUTUBE = "https://www.youtube.com/watch?v=Dc4_aBFAYWE&pp=0gcJCdkKAYcqIYzv"
 JUMLAH_CLIP = 10
 RASIO = "9:16"
 FONT_STYLE = "DEFAULT"
-GEMINI_MODEL = "gemini-3-flash-preview"
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 # Use 'float32' for Kaggle CPU/T4 limitations, or 'float16' for standard Colab T4 GPUs
 WHISPER_COMPUTE_TYPE = "float32"
 
@@ -108,7 +108,7 @@ WHISPER_COMPUTE_TYPE = "float32"
   --no-bgm
 ```
 
-> 💡 **New to this project?** Use the **[Quick Start Notebook](notebooks/Quick_Start.ipynb)** — a beginner-friendly notebook with minimal configuration, step-by-step English instructions, and only 3 settings to change (YouTube URL, total clips, and Whisper model).
+> 💡 **New to this project?** Use the **[Quick Start Notebook](notebooks/OpenClippingQuickStart.ipynb)** — a beginner-friendly notebook with minimal configuration, step-by-step English instructions, and only 3 settings to change (YouTube URL, total clips, and Whisper model).
 >
 > We also include `notebooks/Lib_OpenSource_Clipping.ipynb` as a full-featured template.
 
@@ -275,8 +275,11 @@ python main.py --help
 | `--words-per-sub` | `5` | Max words per karaoke subtitle group |
 | `--hook-duration` | `3` | Hook teaser duration (seconds) |
 | `--font-style` | `HORMOZI` | Font preset (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`) |
+| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time) |
+| `--caption-color` | — | Accent color for `--caption-style` as `#RRGGBB` |
 | `--no-broll` | — | Disable B-roll footage |
-| `--no-hook` | — | Disable hook glitch teaser |
+| `--no-hook` | — | Disable the hook teaser |
+| `--hook-transition` | `flash` | Transition between the hook teaser and the clip: `flash` (short white flash) or `glitch` (VHS static) |
 | `--hook-source` | `None` | Google Drive URL or local path for a single custom hook video (.mp4) |
 | `--hook-source-start` | `0.0` | Start time in seconds for the custom hook video |
 | `--no-bgm` | — | Disable background music |
@@ -307,8 +310,9 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Whisper model size ([see here](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper) for options) |
 | `--whisper-device` | `cuda` | Whisper device (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float32`, `float16`, `int8`, etc.) |
-| `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
-| `--gemini-fallback-model` | `gemini-2.5-flash` | Gemini fallback model name if main model fails |
+| `--gemini-model` | `gemini-3.1-flash-lite` | Gemini model name |
+| `--gemini-fallback-model` | `gemini-3.8-flash` | Gemini fallback model name if main model fails |
+| `--lang` | `en` | Language for all generated metadata: titles, captions, hashtags and thumbnail (e.g. `en`, `pt-BR`, `es`) |
 | `--load-gemini-json` | `False` | Load the saved `gemini_response.json` from the output directory to bypass the Gemini API call |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
 | `--dynamic-split` | `False` | Automatically switch between full-screen and split-screen based on activity (requires `--split-screen`) |
@@ -326,6 +330,7 @@ python main.py --help
 | `--track-smooth` | `None` | Camera catch-up speed factor (default: `0.30`) |
 | `--track-jitter` | `None` | Pixel threshold to ignore micro-shakes (default: `5`) |
 | `--track-snap` | `None` | Jump threshold to trigger hard cut between speakers (default: `0.25`) |
+| `--track-hold` | `2.0` | Minimum seconds the camera stays on a face after a cut before it can cut again |
 | `--track-conf` | `0.55` | **[Experimental]** Face detection confidence threshold (raise to prevent ghosts) |
 | `--track-smooth-window` | `12` | **[Experimental]** Frame window for layout stability (12 frames ≈ 0.5s) |
 | `--scene-cut-threshold` | `18` | **[Experimental]** Sensitivity for camera-cut detection (instantly resets history) |

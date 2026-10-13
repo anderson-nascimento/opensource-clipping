@@ -51,6 +51,7 @@ typography = _load_studio_internal_module("typography.py", "clipping_studio_typo
 download_google_font = typography.download_google_font
 register_fonts_for_libass = typography.register_fonts_for_libass
 prepare_typography_fonts = typography.prepare_typography_fonts
+caption_presets = _load_studio_internal_module("caption_presets.py", "clipping_studio_caption_presets")
 
 def create_ass_file(
     transcript_segments,
@@ -141,6 +142,15 @@ def create_ass_file(
         margin_v = int((cfg.ass_margin_916 if _is_vertical_ratio(ratio) else cfg.ass_margin_169) * scale_factor)
     font_sz = int((cfg.ass_font_916 if _is_vertical_ratio(ratio) else cfg.ass_font_169) * scale_factor)
     margin_lr = int((60 if _is_vertical_ratio(ratio) else 40) * scale_factor)
+
+    caption_style = getattr(cfg, "caption_style", "classic")
+    if caption_style in caption_presets.PRESETS:
+        caption_presets.write_preset_ass(
+            caption_style, transcript_segments, start_clip, end_clip, ass_filename,
+            play_res_x, play_res_y, scale_factor, margin_v, ratio == "split", cfg,
+            typography_plan=typography_plan,
+        )
+        return
 
     header = (
         f"[Script Info]\n"

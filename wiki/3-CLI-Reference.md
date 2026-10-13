@@ -22,8 +22,9 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | Argument | Default | Description |
 |---|---|---|
 | `--ai-provider` | `gemini` | AI provider for analysis: `gemini` or `nvidia` |
-| `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
-| `--gemini-fallback-model` | `gemini-2.5-flash` | Fallback model if main model fails |
+| `--gemini-model` | `gemini-3.1-flash-lite` | Gemini model name |
+| `--gemini-fallback-model` | `gemini-3.8-flash` | Fallback model if main model fails |
+| `--lang` | `en` | Language for all generated metadata: titles, captions, hashtags and thumbnail (e.g. `en`, `pt-BR`, `es`) |
 | `--nvidia-model` | `deepseek-ai/deepseek-v4-pro` | Model name for NVIDIA NIM API |
 | `--load-gemini-json` | `False` | Load saved `gemini_response.json` to bypass AI call |
 
@@ -39,6 +40,7 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | `--hook-source-start` | `0.0` | Start time in seconds for custom hook |
 | `--no-broll` | — | Disable B-roll footage |
 | `--no-hook` | — | Disable hook glitch teaser (V1) |
+| `--hook-transition` | `flash` | Transition between the hook teaser and the clip: `flash` (short white flash) or `glitch` (VHS static) |
 | `--no-bgm` | — | Disable background music |
 | `--no-subs` | — | Disable all subtitle rendering |
 | `--no-karaoke` | — | Use clean text instead of karaoke highlight |
@@ -63,6 +65,8 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | Argument | Default | Description |
 |---|---|---|
 | `--font-style` | `HORMOZI` | Font preset: `DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC` |
+| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time) |
+| `--caption-color` | — | Accent color for `--caption-style` as `#RRGGBB` |
 | `--advanced-text` | `False` | Enable kinetic typography (word scaling & animation) |
 | `--advanced-text-hook` | `False` | Enable kinetic typography on hook teaser |
 
@@ -148,6 +152,7 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | `--track-smooth` | `0.30` | Camera catch-up speed factor |
 | `--track-jitter` | `5` | Pixel threshold to ignore micro-shakes |
 | `--track-snap` | `0.25` | Jump threshold for hard cut between speakers |
+| `--track-hold` | `2.0` | Minimum seconds the camera stays on a face after a cut before it can cut again |
 | `--track-conf` | `0.55` | Face detection confidence threshold |
 | `--track-smooth-window` | `12` | Frame window for layout stability (~0.5s) |
 | `--scene-cut-threshold` | `18` | Sensitivity for camera-cut detection |

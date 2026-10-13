@@ -8,6 +8,28 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [v3.0.0] - 2026-10-12
+
+### Changed (Breaking)
+- **Single Metadata Language**: New `--lang` option (default `en`). All generated metadata (title, TikTok title and caption, hashtags, descriptions, YouTube tags and thumbnail text) is now produced in one language. The fixed English + Indonesian fields (`title_english`, `title_indonesian`, `tiktok_title_id`, `tiktok_caption_id`) were replaced by `title`, `tiktok_title` and `tiktok_caption`; manifests now carry `title` and `tiktok_title_final`. Saved AI responses using the old fields are migrated automatically.
+- **Cheaper Default AI Model**: The default model is now `gemini-3.1-flash-lite`, with `gemini-3.8-flash` as the fallback. The fallback now kicks in after ~2 minutes of retries (4 attempts) instead of ~30 minutes.
+- **Hook Transition**: The hook teaser now uses a short white flash by default instead of the VHS static. Use `--hook-transition glitch` for the previous look.
+
+### Added
+- **Caption Styles**: New `--caption-style` presets `box` (spoken word inside a colored box), `yellow_pop` (spoken word turns yellow and pops) and `one_word` (one big word at a time), plus `--caption-color` for the accent color. `classic` remains the default.
+- **Camera Hold Time**: New `--track-hold` option (default `2.0` seconds).
+- **Colab Notebook**: Branch selector and the new options (language, caption style, hook transition, model).
+
+### Fixed
+- **Camera Jumping Between Speakers**: When two faces had a similar size, the crop could jump side to side in under a second. A new face must now persist for 0.5s before a cut (applied from when it first appeared), and the camera holds for at least `--track-hold` seconds between cuts.
+- **Subtitle Rendering on Windows**: Every `subtitles=` filter failed on Windows paths (`C:\Users\...`) with `No option name near ...`, so no clip was rendered there. Filter paths now use forward slashes and are escaped for both FFmpeg parsing levels, which also covers quotes, commas, brackets and semicolons in paths.
+- **Leftover Indonesian Label**: The download progress bar still showed "Unduh"; it now reads "Download".
+
+### Other
+- Renamed `notebooks/Quick_Start.ipynb` to `notebooks/OpenClippingQuickStart.ipynb`.
+
+---
+
 ## [v2.0.0] - 2026-10-11
 
 ### Changed (Breaking)

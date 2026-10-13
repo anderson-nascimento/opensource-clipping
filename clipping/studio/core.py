@@ -144,8 +144,7 @@ def process_clip(
             h_end = vid_duration
     m_start = float(clip["start_time"])
     m_end = float(clip["end_time"])
-    title = clip.get("title_indonesian")
-    title_en = clip.get("title_english")
+    title = clip.get("title") or clip.get("youtube_title_final")
     
     out_vid = os.path.join(cfg.outputs_dir, f"highlight_rank_{rank}_ready.mp4")
     if getattr(cfg, "dev_mode_with_output_merge", False):
@@ -166,17 +165,15 @@ def process_clip(
         "ratio": ratio,
         "video_path": out_vid,
         "thumbnail_path": out_thm,
-        "thumbnail_text": title_en or title or f"Highlight {rank}",
-        "youtube_title_final": clip.get(
-            "youtube_title_final", clip.get("title_english", "")
-        ),
+        "thumbnail_text": title or f"Highlight {rank}",
+        "youtube_title_final": clip.get("youtube_title_final", title or ""),
         "youtube_description_final": clip.get("youtube_description_final", ""),
         "youtube_tags_final": clip.get("youtube_tags_final", []),
         "tiktok_caption_final": clip.get(
             "tiktok_caption_final", clip.get("hashtags", "")
         ),
-        "title_indonesian": clip.get("title_indonesian", ""),
-        "title_english": clip.get("title_english", ""),
+        "title": title or "",
+        "tiktok_title_final": clip.get("tiktok_title_final", ""),
         "hashtags": clip.get("hashtags", ""),
         "start_time": m_start,
         "end_time": m_end,
@@ -190,8 +187,7 @@ def process_clip(
 
     print(f"\n{'=' * 70}")
     print(f"🔥 [Rank {rank}] Processing clip")
-    print(f"📝 [Title ID]     : '{clip.get('title_indonesian', '-')}'")
-    print(f"📝 [Title EN]     : '{clip.get('title_english', '-')}'")
+    print(f"📝 [Title]        : '{title or '-'}'")
     print(f"#️⃣ [Hastag]      : '{clip.get('hashtags', '-')}'")
     print(f"🧠 Active encoder : {video_encoder['name']}")
     print(f"{'=' * 70}")
@@ -1078,7 +1074,7 @@ def process_clip(
                     if os.path.exists(glow_full_path):
                         os.remove(glow_full_path)
 
-        thumbnail_title = title_en or title or f"Highlight {rank}"
+        thumbnail_title = title or f"Highlight {rank}"
         create_thumbnail(out_vid, out_thm, thumbnail_title, cfg)
 
         manifest_item["status"] = "success"

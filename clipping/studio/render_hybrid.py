@@ -46,6 +46,7 @@ run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _get_cv2_interpolation = utils._get_cv2_interpolation
 _resize_frame = utils._resize_frame
+SequentialFrameSampler = utils.SequentialFrameSampler
 _get_render_dims = utils._get_render_dims
 _is_vertical_ratio = utils._is_vertical_ratio
 RATIO_MAP = utils.RATIO_MAP
@@ -180,9 +181,9 @@ def create_hybrid_video(
     else:
         print(f"🧠 {label} - Face analysis started...", flush=True)
 
+    face_sampler = SequentialFrameSampler(cap, start_clip)
     while current_time <= duration and not skip_tracking:
-        cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
-        ret, frame = cap.read()
+        ret, frame = face_sampler.read_at(current_time)
         if not ret:
             break
 

@@ -149,7 +149,7 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
 
     # Step 6 — Video encoder & glitch
     os.environ["OSC_VIDEO_SCALE_ALGO"] = str(
-        getattr(cfg, "video_scale_algo", "lanczos")
+        getattr(cfg, "video_scale_algo", "bicubic")
     )
     
     # Get target dimensions for auto-bitrate calculation

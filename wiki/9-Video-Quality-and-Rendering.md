@@ -53,6 +53,12 @@ python main.py --url "VIDEO_URL" --source-height 1440 --render-height source
 
 ## Encoder Quality
 
+### Encoder Selection
+
+With `--video-encoder auto` (default) the first working encoder is used, in this order: NVIDIA NVENC → Intel Quick Sync (`h264_qsv`) → AMD AMF → VAAPI → CPU `libx264`. Force one with `--video-encoder nvenc|qsv|amf|vaapi|cpu`; if the forced encoder is not available, rendering falls back to `libx264`.
+
+**Intel Quick Sync** uses ICQ mode with `global_quality = --video-quality-crf + 3` (23 for the default CRF 20), which matched `libx264` CRF 20 in quality on a 1080×1920 clip with a slightly smaller file. It needs an FFmpeg build with QSV (e.g. the Gyan.dev builds on Windows) and an Intel GPU with Quick Sync.
+
 ### CQ (NVENC — NVIDIA GPU Encoder)
 
 | Value | Quality | File Size |
@@ -146,8 +152,8 @@ Controls how the video is resized during rendering:
 
 | Algorithm | Description | Speed |
 |---|---|---|
-| `lanczos` (default) | Sharpest, preserves detail | Slowest |
-| `bicubic` | Balanced quality | Medium |
+| `lanczos` | Sharpest, preserves detail | Slowest (~4.5x slower than `bicubic` per frame) |
+| `bicubic` (default) | Visually identical to `lanczos` when upscaling the crop | Fast |
 | `bilinear` | Smooth but softer | Fast |
 | `area` | Good for downscaling | Fast |
 

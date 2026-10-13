@@ -99,6 +99,10 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
 
     # Step 4 — Metadata normalisation
     ai_clips = metadata.normalize_and_validate(ai_clips)
+    if getattr(cfg, "snap_cuts", True):
+        from . import clip_bounds
+
+        clip_bounds.snap_clips(ai_clips, transcript_segments)
     metadata.print_preview(ai_clips)
 
     metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
@@ -252,6 +256,12 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
         # Attach source URL so metadata.py can auto-add source credit
         if not row.get("source_url"):
             row["source_url"] = getattr(cfg, "url_youtube", None)
+
+    # Step 7.5 — HyperFrames handoff packages (motion design happens later in Claude Code)
+    if getattr(cfg, "handoff", False):
+        from . import handoff
+
+        handoff.export_all(render_manifest, ai_clips, transcript_segments, cfg)
 
     # Step 8 — Save manifest
     manifest_path = os.path.join(cfg.outputs_dir, "render_manifest.json")

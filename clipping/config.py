@@ -316,6 +316,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--no-bgm", action="store_true", help="Disable background music")
     p.add_argument(
+        "--handoff",
+        action="store_true",
+        help="Render clean 9:16 clips (no captions, hook, B-roll, music, watermark or glow) and export one "
+        "HyperFrames handoff package per clip to outputs/handoff/, for the Claude Code skill /clip-recut",
+    )
+    p.add_argument(
         "--bgm-mode",
         choices=["ducking", "background"],
         default=BGM_MODE,
@@ -659,6 +665,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable AI segment trimming (render full start-to-end instead of keep_segments).",
     )
     hook_v2_group.add_argument(
+        "--no-snap-cuts",
+        action="store_true",
+        default=False,
+        help="Keep the AI's clip start/end as is instead of moving them to the nearest sentence "
+        "boundary (word timestamps), which avoids clips opening or ending mid-sentence.",
+    )
+    hook_v2_group.add_argument(
         "--silence-trim",
         action="store_true",
         default=False,
@@ -825,6 +838,14 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     # Normalize URL list for batch support
     url_list = args.url if isinstance(args.url, list) else ([args.url] if args.url else [])
 
+    if args.handoff:
+        if args.story_mode:
+            parser.error("--handoff does not support --story-mode.")
+        if args.ratio != "9:16":
+            parser.error("--handoff renders 9:16 clips only (the package targets a 1080x1920 canvas).")
+        if args.voiceover:
+            parser.error("--handoff cannot be combined with --voiceover (it shifts the transcript timing).")
+
     # Validate watermark args
     if args.watermark:
         if not args.text and not args.image:
@@ -897,6 +918,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         hook_v2_style=args.hook_v2_style,
         white_flash_duration=args.white_flash_duration,
         no_segment_trim=args.no_segment_trim,
+        snap_cuts=not args.no_snap_cuts,
         silence_trim=args.silence_trim,
         use_broll=not args.no_broll,
         use_hook_glitch=not args.no_hook,
@@ -1007,6 +1029,18 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         watermark_padding=args.padding,
         watermark_font_size=args.watermark_font_size,
         watermark_scale=args.watermark_scale,
+        handoff=args.handoff,
     )
+
+    # --handoff renders the clip clean: captions, hook, B-roll and music are designed later in
+    # HyperFrames, and the package transcript must match the clip timeline exactly.
+    if args.handoff:
+        cfg.no_subs = True
+        cfg.use_hook_glitch = False
+        cfg.hook_v2 = False
+        cfg.use_broll = False
+        cfg.use_auto_bgm = False
+        cfg.watermark_enabled = False
+        cfg.edge_glow = False
 
     return cfg

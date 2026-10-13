@@ -271,6 +271,7 @@ python main.py --help
 | `--video-cq` | `23` | NVENC CQ quality target (lower is sharper). [Range: 15-20 (Ultra Sharp), 21-25 (Standard), 26-50 (Blurry)] |
 | `--video-crf` | `20` | libx264 CRF quality target (lower is sharper). [Range: 15-20 (Ultra Sharp), 21-25 (Standard), 26-50 (Blurry)] |
 | `--video-preset` | `auto` | Encoder preset override (NVENC: `p1`-`p7`, x264: `ultrafast`-`veryslow`). Use `auto` for default. |
+| `--video-encoder` | `auto` | Video encoder: `auto` tries NVIDIA NVENC, Intel Quick Sync (`qsv`), AMD AMF, VAAPI, then CPU `libx264`. Force one with `nvenc`, `qsv`, `amf`, `vaapi` or `cpu`. |
 | `--video-scale-algo` | `bicubic` | Resize algorithm for render (`bicubic`: balanced and fast, `lanczos`: sharpest but ~4.5x slower, `area`/`bilinear`: fastest/softer) |
 | `--words-per-sub` | `5` | Max words per karaoke subtitle group |
 | `--hook-duration` | `3` | Hook teaser duration (seconds) |

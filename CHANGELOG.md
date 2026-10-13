@@ -8,7 +8,7 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
-## [Unreleased]
+## [v3.1.0] - 2026-10-12
 
 ### Added
 - **Intel Quick Sync Encoding**: `h264_qsv` is now detected automatically (order: NVENC → Quick Sync → AMF → VAAPI → CPU). It uses ICQ mode with `global_quality = CRF + 3`, which matched `libx264` CRF 20 in quality with 3–13% smaller files. On the benchmark PC (Intel UHD Graphics) it cut render time from 102s to 82s.

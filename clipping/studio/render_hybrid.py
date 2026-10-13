@@ -56,6 +56,90 @@ crop_center_broll = broll.crop_center_broll
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
 
+# Mean absolute difference (0-255) between consecutive 64x36 grayscale face-analysis samples
+# above which the source is treated as a camera cut. Measured on a podcast: cuts 50-60,
+# speaker motion under 10.
+SCENE_CUT_DIFF = 25.0
+
+
+def smooth_camera_path(raw_data, crop_w, width, deadzone_ratio, smooth_factor, snap_threshold,
+                       track_hold, snap_confirm=0.5):
+    """
+    Turn per-sample face centers into a smooth camera path for the crop.
+
+    Args:
+        raw_data: Samples [{"time", "cx", "cy", "box", "scene_cut"}]; box is None when no face was found.
+        crop_w: Crop width in source pixels.
+        width: Source frame width.
+        deadzone_ratio, smooth_factor, snap_threshold: Tracking tuning (see create_hybrid_video).
+        track_hold: Minimum seconds between two cuts to a different face.
+        snap_confirm: Seconds a new face position must persist before the camera cuts to it.
+
+    Returns:
+        list[dict]: [{"time", "cx", "cy"}], one entry per sample.
+
+    Rules:
+        - Moves inside the deadzone are ignored; larger ones are eased by smooth_factor.
+        - A jump bigger than the snap distance is a cut to another face. It must persist
+          snap_confirm seconds and land at least track_hold seconds after the previous cut, so
+          two similar faces cannot flip the crop every sample. A cut that arrives during the
+          hold is delayed to the end of the hold, never dropped (a dropped cut left the crop on
+          the wrong person until the face moved again).
+        - A camera cut in the source (scene_cut) jumps straight to the new face and starts a new hold.
+        - Samples without a face keep the camera still, except right after a camera cut with no
+          face in view, where the camera re-centers.
+    """
+    if not raw_data:
+        return []
+    import statistics as _st
+
+    first = [d for d in raw_data[:5] if d["box"] is not None] or raw_data[:5]
+    cam_cx = _st.median(d["cx"] for d in first)
+    cam_cy = _st.median(d["cy"] for d in first)
+    deadzone_px = crop_w * deadzone_ratio
+    # Consistent aggressive snapping for wide-to-tight camera cuts in standard clips
+    snap_px = width * (snap_threshold if snap_threshold < 0.1 else 0.08)
+
+    path = []
+    last_cut_time = float("-inf")
+    cand_cx = None      # position of a pending cut target
+    cand_idx = None     # sample index where the target first appeared
+    for i, d in enumerate(raw_data):
+        has_face = d["box"] is not None
+        if d.get("scene_cut"):
+            cand_cx = None
+            last_cut_time = d["time"]
+            if has_face:
+                cam_cx, cam_cy = d["cx"], d["cy"]
+            else:
+                cam_cx, cam_cy = width / 2, d["cy"]
+        elif has_face:
+            face_cx, face_cy = d["cx"], d["cy"]
+            if abs(face_cx - cam_cx) > snap_px:
+                if cand_cx is None or abs(face_cx - cand_cx) > snap_px:
+                    cand_cx, cand_idx = face_cx, i
+                cut_time = max(raw_data[cand_idx]["time"], last_cut_time + track_hold)
+                if d["time"] - raw_data[cand_idx]["time"] >= snap_confirm and d["time"] >= cut_time:
+                    # Back-date the cut to when the new face first appeared (or the end of
+                    # the hold), so the confirmation delay does not make the camera lag.
+                    cam_cx = face_cx
+                    for prev in path[cand_idx:]:
+                        if prev["time"] >= cut_time:
+                            prev["cx"] = cam_cx
+                    last_cut_time = cut_time
+                    cand_cx = None
+            else:
+                cand_cx = None
+                if face_cx > cam_cx + deadzone_px:
+                    cam_cx += (face_cx - (cam_cx + deadzone_px)) * smooth_factor
+                elif face_cx < cam_cx - deadzone_px:
+                    cam_cx += (face_cx - (cam_cx - deadzone_px)) * smooth_factor
+            cam_cy += (face_cy - cam_cy) * smooth_factor
+
+        path.append({"time": d["time"], "cx": cam_cx, "cy": cam_cy})
+    return path
+
+
 def create_hybrid_video(
     input_video,
     output_video,
@@ -182,11 +266,16 @@ def create_hybrid_video(
         print(f"🧠 {label} - Face analysis started...", flush=True)
 
     face_sampler = SequentialFrameSampler(cap, start_clip)
+    prev_small = None
     while current_time <= duration and not skip_tracking:
         ret, frame = face_sampler.read_at(current_time)
         if not ret:
             break
 
+        # Camera cuts in the source: a large change between consecutive samples.
+        small = cv2.cvtColor(cv2.resize(frame, (64, 36), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        scene_cut = prev_small is not None and float(np.abs(small - prev_small).mean()) > SCENE_CUT_DIFF
+        prev_small = small
 
         face_box = None
 
@@ -228,6 +317,7 @@ def create_hybrid_video(
                 "cx": center_x if face_box else default_cx,
                 "cy": center_y if face_box else default_cy,
                 "box": face_box,
+                "scene_cut": scene_cut,
             }
         )
 
@@ -241,52 +331,9 @@ def create_hybrid_video(
         current_time += DETECTION_STEP
 
     # FASE 2: SMOOTH CAMERA
-    smooth_data = []
-    if raw_data:
-        import statistics as _st
-        initial_cxs = [d["cx"] for d in raw_data[:5]]
-        initial_cys = [d["cy"] for d in raw_data[:5]]
-        cam_cx = _st.median(initial_cxs) if initial_cxs else raw_data[0]["cx"]
-        cam_cy = _st.median(initial_cys) if initial_cys else raw_data[0]["cy"]
-        
-        deadzone_px = crop_w * DEADZONE_RATIO
-        
-        # Consistent aggressive snapping for wide-to-tight camera cuts in standard clips
-        temp_snap = SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08
-        snap_px = width * temp_snap
-
-        last_cut_time = float("-inf")
-        cand_cx = None      # position of a pending cut target
-        cand_idx = None     # index in smooth_data where the target first appeared
-
-        for d in raw_data:
-            face_cx = d["cx"]
-            face_cy = d["cy"]
-
-            if abs(face_cx - cam_cx) > snap_px:
-                if cand_cx is None or abs(face_cx - cand_cx) > snap_px:
-                    cand_cx, cand_idx = face_cx, len(smooth_data)
-                cand_time = raw_data[cand_idx]["time"]
-                if (d["time"] - cand_time >= SNAP_CONFIRM
-                        and cand_time - last_cut_time >= TRACK_HOLD):
-                    # Cut back-dated to when the new face first appeared, so the
-                    # confirmation delay does not make the camera lag behind.
-                    cam_cx = face_cx
-                    for prev in smooth_data[cand_idx:]:
-                        prev["cx"] = cam_cx
-                    last_cut_time = cand_time
-                    cand_cx = None
-            else:
-                cand_cx = None
-                if face_cx > cam_cx + deadzone_px:
-                    cam_cx += (face_cx - (cam_cx + deadzone_px)) * SMOOTH_FACTOR
-                elif face_cx < cam_cx - deadzone_px:
-                    cam_cx += (face_cx - (cam_cx - deadzone_px)) * SMOOTH_FACTOR
-
-            # Vertical smoothing
-            cam_cy += (face_cy - cam_cy) * SMOOTH_FACTOR
-
-            smooth_data.append({"time": d["time"], "cx": cam_cx, "cy": cam_cy})
+    smooth_data = smooth_camera_path(
+        raw_data, crop_w, width, DEADZONE_RATIO, SMOOTH_FACTOR, SNAP_THRESHOLD, TRACK_HOLD, SNAP_CONFIRM
+    )
 
     def get_x(t):
         if not smooth_data:

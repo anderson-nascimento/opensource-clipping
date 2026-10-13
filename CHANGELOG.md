@@ -8,6 +8,17 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [Unreleased]
+
+### Added
+- **HyperFrames Handoff (`--handoff`)**: Renders each clip clean (9:16 reframe, no captions, hook, B-roll, music, watermark or glow) and exports a package to `outputs/handoff/rank_<n>/`: `BRIEF.md`, `STYLE.md`, a word-level `transcript.json` on the clip timeline (also correct for multi-segment clips), the AI plan, image ideas, and a `public/` folder with a seekable 30 fps copy of the clip, GSAP, Anton/Inter fonts and 8 SFX (cached in `.cache/handoff/`).
+- **Claude Code skill `/clip-recut`** (`.claude/skills/clip-recut`): Designs the clip's motion graphics with HyperFrames following `assets/handoff/STYLE.md` (composition change every 2.5–3.5s on word starts, 20–30% full-screen takeovers, hook banner, one-word captions in two tiers, SFX), optionally generates images through the `google-flow` MCP, runs `hyperframes lint`/`snapshot` QA and renders `output.mp4`. Includes a reference composition and a captions generator script.
+- **Sentence-aware clip cuts**: The AI's clip start/end (and `keep_segments`) are moved to the nearest sentence boundary using Whisper word timestamps, with a short lead-in and tail, so clips no longer open mid-sentence or end on a dangling word. Starts move back up to 5s to the start of the sentence (or forward up to 3s); ends finish the sentence when it ends within 2.5s, otherwise drop a fragment of up to 3s (or extend up to 6s). A trailing "..." is not used as an ending. Disable with `--no-snap-cuts`. On the benchmark video, all 3 clips had a broken boundary before (e.g. one opened on "...bem prático." instead of "Todo mundo tem um plano").
+- **`python -m clipping.handoff collect <outputs_dir>`**: Points `render_manifest.json` at the rendered `output.mp4` files (keeping `clean_video_path`), so the uploaders publish the designed versions.
+
+### Fixed
+- **Face tracking stuck after a camera cut**: In the default (hybrid) renderer, a cut to a new face that arrived less than `--track-hold` seconds after the previous cut was dropped for good, leaving the crop on an empty part of the frame (e.g. a plant) until the face moved again. Such cuts are now delayed to the end of the hold instead. Camera cuts in the source are detected from frame differences and re-frame immediately, and samples with no face keep the camera still instead of pulling it to the center.
+
 ## [v3.1.0] - 2026-10-12
 
 ### Added

@@ -279,6 +279,7 @@ python main.py --help
 | `--hook-source` | `None` | URL Google Drive atau path lokal untuk file video custom hook tunggal (.mp4) |
 | `--hook-source-start` | `0.0` | Waktu mulai (detik) di dalam video custom hook |
 | `--no-bgm` | — | Nonaktifkan musik latar |
+| `--handoff` | — | Render klip 9:16 bersih (tanpa subtitle, hook, B-roll, musik, watermark, glow) dan ekspor paket HyperFrames per klip ke `outputs/handoff/` untuk skill Claude Code `/clip-recut`. Lalu `python -m clipping.handoff collect outputs` agar uploader memakai `output.mp4` |
 | `--bgm-mode` | `ducking` | Mode mixing BGM: `ducking` (sidechain compress — volume BGM otomatis turun saat bicara) atau `background` (volume konstan rendah) |
 | `--edge-glow` | `False` | Terapkan efek ambient edge glow ke seluruh output video (hook, klip, broll, voiceover). Secara default, glow hanya muncul pada intro voice-over. |
 | `--edge-glow-mode` | `smooth` | Strategi render edge glow: `default` (original 10s loop, bisa patah di titik loop), `smooth` (10s loop dengan auto-adjusted speed agar seamless), `full` (render full durasi tanpa loop, lebih berat tapi anti-patah). |
@@ -495,6 +496,7 @@ Contoh:
 | *(default, tanpa flag)* | AI smart-trim bagian boring/filler | Clip utama saja |
 | `--silence-trim` | AI trim lebih agresif — jeda >0.5 detik dibuang | Clip utama saja |
 | `--no-segment-trim` | Tidak ada trim, render penuh start-to-end | Clip utama saja |
+| `--no-snap-cuts` | Pakai start/end persis dari AI, tanpa digeser ke batas kalimat | Batas clip |
 
 > [!NOTE]
 > - **Hook V2 tidak terpengaruh** oleh ketiga opsi di atas. Hook V2 selalu mengambil potongan cepat sesuai yang AI pilih.

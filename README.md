@@ -46,6 +46,7 @@
 | **Auto Facebook Reels Uploader** | Upload Reels to Facebook Pages via Meta Graph API with smart scheduling — first clip publishes immediately, subsequent clips auto-schedule at configurable intervals (optional) |
 | **Podcast Split-Screen** | Auto speaker diarization via **Pyannote** with top-bottom split-screen layout for podcasts (9:16). Supports **3+ speakers across multiple scenes** with per-speaker frozen frame fallback |
 | **Podcast Camera Switch** | Auto active-speaker detection with scene-aware switching — full 9:16 crop focuses on whoever is talking; blurred pillarbox only when speakers in the same scene talk simultaneously (9:16) |
+| **HyperFrames Handoff** | `--handoff` exports each clip as a package (clean 9:16 clip, word-level transcript, AI plan, fonts, SFX) for the Claude Code skill `/clip-recut`, which designs split layouts, full-screen takeovers, kinetic type and one-word captions with **[HyperFrames](https://hyperframes.heygen.com)** and renders the final Short |
 | **AI Voice-Over** | Converts auto-clips into original commentary/reaction videos using **Gemini** (script generation) and **edge-tts** (free text-to-speech), complete with audio ducking, text override, and ambient edge glow |
 
 > 🎬 **NEW: Story Clip Mode (`--story-mode`)**  
@@ -284,6 +285,7 @@ python main.py --help
 | `--hook-source` | `None` | Google Drive URL or local path for a single custom hook video (.mp4) |
 | `--hook-source-start` | `0.0` | Start time in seconds for the custom hook video |
 | `--no-bgm` | — | Disable background music |
+| `--handoff` | — | Render clean 9:16 clips (no captions, hook, B-roll, music, watermark or glow) and export a HyperFrames package per clip to `outputs/handoff/` for the Claude Code skill `/clip-recut` (see [HyperFrames Handoff](#-hyperframes-handoff-motion-design-in-claude-code)) |
 | `--bgm-mode` | `ducking` | BGM mixing mode: `ducking` (sidechain compress — BGM auto-lowers during speech) or `background` (constant low volume mix) |
 | `--edge-glow` | `False` | Apply ambient edge glow to the entire output video (hook, clip, broll, voiceover). By default, glow only appears on voice-over intros. |
 | `--edge-glow-mode` | `smooth` | Edge glow rendering strategy: `default` (original 10s loop, may stutter at loop points), `smooth` (10s loop with auto-adjusted speed for seamless loop), `full` (renders full duration, heavier but zero stutter). |
@@ -471,6 +473,34 @@ python main.py --url "VIDEO_URL" --voiceover --voiceover-lang id --voiceover-voi
 >
 > See `assets/bgm/README.md` for recommended sources to download free BGM.
 
+## 🎞️ HyperFrames Handoff (motion design in Claude Code)
+
+The pipeline does the mechanical work (download, Whisper, clip selection, face reframing); the
+creative work is handed to a Claude Code chat that runs the project skill `/clip-recut` with
+[HyperFrames](https://hyperframes.heygen.com) (HTML + GSAP rendered to MP4).
+
+```bash
+# 1. Render clean clips and export one package per clip
+python main.py --url "VIDEO_URL" --lang pt-BR --handoff
+
+# 2. In Claude Code, from the project folder (one clip at a time)
+/clip-recut outputs/handoff/rank_1
+
+# 3. Make the uploaders publish the designed versions
+python -m clipping.handoff collect outputs
+```
+
+Each `outputs/handoff/rank_<n>/` package holds `BRIEF.md` (clip summary and contract),
+`STYLE.md` (editing rules, copied from `assets/handoff/STYLE.md` — edit that file to change the
+house style), `transcript.json` (words on the clip timeline, so HyperFrames never re-transcribes),
+`context.json` (AI plan), `assets/manifest.json` (shipped SFX/fonts and image ideas) and
+`public/` (seekable clip, GSAP, fonts, SFX). The skill plans the beats, can generate images with
+the `google-flow` MCP (Nano Banana, only when free by default), writes the composition, checks it
+with `hyperframes lint`/`snapshot` and renders `output.mp4` (~2 min for a 26s clip on a laptop CPU).
+
+Requirements: Node.js 22+ (`npx hyperframes`), FFmpeg and Claude Code. `--handoff` needs
+`--ratio 9:16` and cannot be combined with `--voiceover`.
+
 ## 🎬 Understanding Hook V2 & Segment Trimming
 
 ### Final Video Structure
@@ -517,6 +547,7 @@ Example:
 | *(default, no flag)* | AI smart-trims boring/filler sections | Main clip only |
 | `--silence-trim` | AI trims more aggressively — pauses >0.5s removed | Main clip only |
 | `--no-segment-trim` | No trimming, full start-to-end render | Main clip only |
+| `--no-snap-cuts` | Keep the AI's exact start/end instead of snapping them to sentence boundaries | Clip boundaries |
 
 > [!NOTE]
 > - **Hook V2 is not affected** by any of the above flags. Hook V2 always picks its rapid-fire clips as chosen by AI.

@@ -42,6 +42,7 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | `--no-hook` | — | Disable hook glitch teaser (V1) |
 | `--hook-transition` | `flash` | Transition between the hook teaser and the clip: `flash` (short white flash) or `glitch` (VHS static) |
 | `--no-bgm` | — | Disable background music |
+| `--handoff` | — | Render clean 9:16 clips and export a HyperFrames package per clip to `outputs/handoff/` for the Claude Code skill `/clip-recut`; then `python -m clipping.handoff collect outputs` |
 | `--no-subs` | — | Disable all subtitle rendering |
 | `--no-karaoke` | — | Use clean text instead of karaoke highlight |
 
@@ -56,6 +57,7 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | `--hook-v2-style` | `controversial_fast_glitch` | Style prompt for AI hook selection |
 | `--white-flash-duration` | `0.12` | Duration of flash transition between hooks (seconds) |
 | `--no-segment-trim` | `False` | Disable AI segment trimming (render full clip) |
+| `--no-snap-cuts` | `False` | Keep the AI's exact clip start/end instead of snapping them to sentence boundaries |
 | `--silence-trim` | `False` | Aggressively trim silence/dead air |
 
 ---

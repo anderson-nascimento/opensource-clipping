@@ -146,8 +146,8 @@ Controls how the video is resized during rendering:
 
 | Algorithm | Description | Speed |
 |---|---|---|
-| `lanczos` (default) | Sharpest, preserves detail | Slowest |
-| `bicubic` | Balanced quality | Medium |
+| `lanczos` | Sharpest, preserves detail | Slowest (~4.5x slower than `bicubic` per frame) |
+| `bicubic` (default) | Visually identical to `lanczos` when upscaling the crop | Fast |
 | `bilinear` | Smooth but softer | Fast |
 | `area` | Good for downscaling | Fast |
 

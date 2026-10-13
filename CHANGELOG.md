@@ -8,6 +8,16 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [Unreleased]
+
+### Changed
+- **~2x Faster Rendering**: Measured on a CPU-only Windows PC (3 clips from a 1080p VP9 podcast), render time dropped from 212s to 102s with visually identical output:
+  - **Sequential face analysis**: face-tracking samples are now read by decoding forward instead of seeking every 0.25s. Seeking a VP9 source cost ~180 ms per sample; the frames returned are identical. Applies to the hybrid, split-screen and camera-switch renderers.
+  - **Bicubic scaling by default**: `--video-scale-algo` now defaults to `bicubic` instead of `lanczos`. Upscaling the 9:16 crop is ~4.5x faster per frame and visually identical (PSNR ~53 dB vs Lanczos). `lanczos` is still available.
+  - **Hook cut from the main render**: the v1 hook teaser is now sliced from the already rendered main clip instead of running face analysis and the frame renderer twice over the same seconds. The previous path is still used for custom hooks, Hook V2, multi-segment clips, dev dual output, or when B-roll overlaps the hook. The hook video now also matches its audio length exactly (the old path rendered one extra frame).
+
+---
+
 ## [v3.0.0] - 2026-10-12
 
 ### Changed (Breaking)

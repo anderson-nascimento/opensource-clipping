@@ -128,7 +128,7 @@ def prepare_glitch_video(ratio, cfg, video_encoder, source_h=1080, custom_dims=N
 
     if use_downloaded and os.path.exists(glitch_raw):
         # Build filter from downloaded video
-        algo = getattr(cfg, "video_scale_algo", "lanczos")
+        algo = getattr(cfg, "video_scale_algo", "bicubic")
         if custom_dims:
             filter_g = f"scale={out_w}:{out_h}:flags={algo},setsar=1"
         else:

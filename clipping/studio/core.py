@@ -245,6 +245,71 @@ def process_clip(
 
     std_p = get_ts_encode_args(video_encoder, fps=30)
 
+    def render_main_visual():
+        """Render the face-tracked main clip (video only) into m_silent."""
+        if use_split:
+            print("   📸 [Main] Split-screen render (Visual)...")
+            return create_split_screen_video(
+                cfg.original_video_file,
+                m_silent,
+                m_start,
+                m_end,
+                ratio,
+                diarization_data,
+                cfg,
+                label=f"Rank {rank} Main SplitScreen",
+                broll_data=broll_enabled,
+            )
+        if use_camera_switch:
+            # Note: Camera Switch doesn't currently support dev_mode frames but we pass it anyway
+            print("   📸 [Main] Camera switch render (Visual)...")
+            return create_camera_switch_video(
+                cfg.original_video_file,
+                m_silent,
+                m_start,
+                m_end,
+                ratio,
+                diarization_data,
+                cfg,
+                label=f"Rank {rank} Main CameraSwitch",
+                broll_data=broll_enabled,
+            )
+        print("   📸 [Main] Hybrid render (Visual)...")
+        return create_hybrid_video(
+            cfg.original_video_file,
+            m_silent,
+            m_start,
+            m_end,
+            ratio,
+            cfg,
+            broll_enabled,
+            label=f"Rank {rank} Main",
+        )
+
+    keep_segments = clip.get("keep_segments")
+    use_segments = (
+        keep_segments
+        and len(keep_segments) > 1
+        and not getattr(cfg, "no_segment_trim", False)
+    )
+
+    # The v1 hook is a slice of the main clip. When the main clip is rendered in
+    # one piece from the same source, cut the hook out of that render instead of
+    # running face analysis and the frame renderer twice over the same seconds.
+    hook_from_main = (
+        hook_enabled
+        and not getattr(cfg, "hook_v2", False)
+        and not custom_hook
+        and not use_segments
+        and not dev_dual
+        and m_start <= h_start < h_end <= m_end
+        and not any(
+            float(b["start_time"]) < h_end and float(b["end_time"]) > h_start
+            for b in broll_enabled
+        )
+    )
+    main_visual_ready = False
+
     try:
         # HOOK
         hook_v2_data = clip.get("hook_v2", {})
@@ -355,7 +420,12 @@ def process_clip(
 
         elif hook_enabled:
             get_x_h = None
-            if use_split:
+            if hook_from_main:
+                print("   ♻️ [Hook] Cutting the hook from the main clip render...")
+                get_x_main = render_main_visual()
+                main_visual_ready = True
+                get_x_h = get_x_main
+            elif use_split:
                 print("   📸 [Hook] Split-screen render (Custom Hook currently ignored or merged for this format)...")
                 get_x_h = create_split_screen_video(
                     file_hook_src,
@@ -419,14 +489,22 @@ def process_clip(
             
             vf_hook = ",".join(vf_hook_list) if vf_hook_list else None
 
+            if hook_from_main:
+                hook_video_input = [
+                    "-ss", f"{h_start - m_start:.3f}",
+                    "-t", f"{h_end - h_start:.3f}",
+                    "-i", m_silent,
+                ]
+            else:
+                hook_video_input = ["-i", h_silent]
+
             cmd_h_base = [
                 "ffmpeg",
                 "-hide_banner",
                 "-loglevel",
                 "verbose",
                 "-y",
-                "-i",
-                h_silent,
+                *hook_video_input,
                 "-ss",
                 str(h_start),
                 "-to",
@@ -450,13 +528,6 @@ def process_clip(
                 raise RuntimeError("FFmpeg hook failed:\n" + "\n".join(err_h))
 
         # MAIN
-        keep_segments = clip.get("keep_segments")
-        use_segments = (
-            keep_segments
-            and len(keep_segments) > 1
-            and not getattr(cfg, "no_segment_trim", False)
-        )
-
         if use_segments:
             print(f"   📸 [Main] Rendering {len(keep_segments)} segments (smart trim)...")
             seg_ts_parts = []
@@ -585,45 +656,10 @@ def process_clip(
 
         else:
             # Standard MAIN render (full start_time → end_time)
-            if use_split:
-                print("   📸 [Main] Split-screen render (Visual)...")
-                get_x_main = create_split_screen_video(
-                    cfg.original_video_file,
-                    m_silent,
-                    m_start,
-                    m_end,
-                    ratio,
-                    diarization_data,
-                    cfg,
-                    label=f"Rank {rank} Main SplitScreen",
-                    broll_data=broll_enabled,
-                )
-            elif use_camera_switch:
-                # Note: Camera Switch doesn't currently support dev_mode frames but we pass it anyway
-                print("   📸 [Main] Camera switch render (Visual)...")
-                get_x_main = create_camera_switch_video(
-                    cfg.original_video_file,
-                    m_silent,
-                    m_start,
-                    m_end,
-                    ratio,
-                    diarization_data,
-                    cfg,
-                    label=f"Rank {rank} Main CameraSwitch",
-                    broll_data=broll_enabled,
-                )
+            if main_visual_ready:
+                print("   ♻️ [Main] Visual already rendered during the hook step.")
             else:
-                print("   📸 [Main] Hybrid render (Visual)...")
-                get_x_main = create_hybrid_video(
-                    cfg.original_video_file,
-                    m_silent,
-                    m_start,
-                    m_end,
-                    ratio,
-                    cfg,
-                    broll_enabled,
-                    label=f"Rank {rank} Main",
-                )
+                get_x_main = render_main_visual()
 
             vo_data = clip.get("voiceover")
             

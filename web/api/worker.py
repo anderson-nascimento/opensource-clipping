@@ -272,7 +272,7 @@ def _run_pipeline_sync(job_id: str, payload: dict) -> None:
             percent=60.0,
         )
 
-        os.environ["OSC_VIDEO_SCALE_ALGO"] = str(getattr(cfg, "video_scale_algo", "lanczos"))
+        os.environ["OSC_VIDEO_SCALE_ALGO"] = str(getattr(cfg, "video_scale_algo", "bicubic"))
 
         import cv2
 

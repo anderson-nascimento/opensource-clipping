@@ -269,7 +269,7 @@ python main.py --help
 | `--video-cq` | `23` | Target kualitas CQ untuk NVENC (lebih kecil = lebih tajam). [Range: 15-20 (Sangat Tajam), 21-25 (Standar), 26-50 (Buram)] |
 | `--video-crf` | `20` | Target kualitas CRF untuk libx264 (lebih kecil = lebih tajam). [Range: 15-20 (Sangat Tajam), 21-25 (Standar), 26-50 (Buram)] |
 | `--video-preset` | `auto` | Override preset encoder (NVENC: `p1`-`p7`, x264: `ultrafast`-`veryslow`). Gunakan `auto` untuk default. |
-| `--video-scale-algo` | `lanczos` | Algoritma resize render (`lanczos`: tajam, `bicubic`: seimbang, `area`/`bilinear`: cepat/buram) |
+| `--video-scale-algo` | `bicubic` | Algoritma resize render (`lanczos`: tajam, `bicubic`: seimbang, `area`/`bilinear`: cepat/buram) |
 | `--words-per-sub` | `5` | Maks kata per grup subtitle karaoke |
 | `--hook-duration` | `3` | Durasi hook teaser (detik) |
 | `--font-style` | `HORMOZI` | Preset font (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`) |

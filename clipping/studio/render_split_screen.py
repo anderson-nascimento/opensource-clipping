@@ -44,6 +44,7 @@ build_ffmpeg_progress_cmd = _ffmpeg_utils.build_ffmpeg_progress_cmd
 run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _resize_frame = utils._resize_frame
+SequentialFrameSampler = utils.SequentialFrameSampler
 _get_render_dims = utils._get_render_dims
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
@@ -224,9 +225,9 @@ def create_split_screen_video(
     def _clamp_x(cx_center: float) -> int:
         return max(0, min(int(cx_center - crop_w / 2), width - crop_w))
 
+    face_sampler = SequentialFrameSampler(cap, start_clip)
     while current_time <= duration:
-        cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
-        ret, frame = cap.read()
+        ret, frame = face_sampler.read_at(current_time)
         if not ret:
             break
 

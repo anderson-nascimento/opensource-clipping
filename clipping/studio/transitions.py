@@ -294,7 +294,7 @@ def prepare_transition_clip(
     if os.path.exists(ts_path):
         return ts_path
 
-    algo = getattr(cfg, "video_scale_algo", "lanczos")
+    algo = getattr(cfg, "video_scale_algo", "bicubic")
 
     if custom_dims:
         vf = f"scale={out_w}:{out_h}:flags={algo},setsar=1"

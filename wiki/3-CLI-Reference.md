@@ -169,7 +169,7 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | `--video-cq` | `23` | NVENC CQ quality (lower = sharper) |
 | `--video-crf` | `20` | libx264 CRF quality (lower = sharper) |
 | `--video-preset` | `auto` | Encoder preset (NVENC: `p1`-`p7`, x264: `ultrafast`-`veryslow`) |
-| `--video-scale-algo` | `lanczos` | Resize algorithm: `lanczos`, `bicubic`, `bilinear`, `area` |
+| `--video-scale-algo` | `bicubic` | Resize algorithm: `bicubic`, `lanczos`, `bilinear`, `area` |
 
 ---
 

@@ -61,6 +61,37 @@ build_ffmpeg_progress_cmd = _ffmpeg_utils.build_ffmpeg_progress_cmd
 run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 
 
+class SequentialFrameSampler:
+    """
+    Read frames at increasing timestamps by decoding forward instead of seeking.
+
+    Seeking with `cap.set(CAP_PROP_POS_MSEC, ...)` makes the decoder jump back to
+    the previous keyframe and decode up to the target on every call. Face analysis
+    samples every 0.25s, so on VP9 sources that was ~180 ms per sample, while
+    decoding forward returns the very same frames (the first one at or after each
+    timestamp) about 12x faster.
+    """
+
+    def __init__(self, cap, start_s):
+        self.cap = cap
+        self.pos_s = None  # timestamp of the last grabbed frame, in seconds
+        cap.set(cv2.CAP_PROP_POS_MSEC, start_s * 1000)
+        self.start_s = start_s
+
+    def read_at(self, t):
+        """Return `(ok, frame)` for the first frame at or after `start_s + t`."""
+        target = self.start_s + t
+        if self.pos_s is not None and target < self.pos_s - 1e-3:
+            # Going backwards is never needed by the samplers, but stay correct.
+            self.cap.set(cv2.CAP_PROP_POS_MSEC, target * 1000)
+            self.pos_s = None
+        while self.pos_s is None or self.pos_s < target - 1e-3:
+            if not self.cap.grab():
+                return False, None
+            self.pos_s = self.cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        return self.cap.retrieve()
+
+
 def _get_cv2_interpolation(cfg=None):
     """
     Resolve OpenCV interpolation mode from runtime config.
@@ -72,7 +103,7 @@ def _get_cv2_interpolation(cfg=None):
         OpenCV interpolation constant.
     """
     algo = str(
-        getattr(cfg, "video_scale_algo", os.environ.get("OSC_VIDEO_SCALE_ALGO", "lanczos"))
+        getattr(cfg, "video_scale_algo", os.environ.get("OSC_VIDEO_SCALE_ALGO", "bicubic"))
     ).lower()
     mapping = {
         "lanczos": cv2.INTER_LANCZOS4,

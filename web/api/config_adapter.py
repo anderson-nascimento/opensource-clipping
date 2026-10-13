@@ -228,6 +228,7 @@ def build_config_from_payload(
         video_bitrate=payload.get("video_bitrate", "auto"),
         video_sharpen=payload.get("video_sharpen", False),
         video_preset=payload.get("video_preset", VIDEO_PRESET),
+        video_encoder=payload.get("video_encoder", "auto"),
         video_scale_algo=payload.get("video_scale_algo", VIDEO_SCALE_ALGO),
         box_face_detection=False,
         dev_mode=False,

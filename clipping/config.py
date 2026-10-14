@@ -38,6 +38,11 @@ USE_CAMERA_SWITCH = False
 DIARIZATION_NUM_SPEAKERS = "auto"
 SWITCH_HOLD_DURATION = 2.0
 AVATAR_RATIO = 0.45  # share of the 9:16 frame height taken by the avatar (--avatar-split)
+# Caption defaults with --avatar-split (the caption band above the seam is short, so
+# condensed text and fewer words per group fit on one line). Explicit flags win.
+AVATAR_CAPTION_STYLE = "box"
+AVATAR_FONT_STYLE = "CINEMATIC"
+AVATAR_WORDS_PER_SUB = 3
 SWITCH_BLEND_DURATION = 0.0  # 0 = instant snap, >0 = smooth blend in seconds
 
 # Source Platform
@@ -283,8 +288,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--words-per-sub",
         type=int,
-        default=MAX_WORDS_PER_SUBTITLE,
-        help="Max words per karaoke subtitle group",
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
+        help=f"Max words per karaoke subtitle group (default: {MAX_WORDS_PER_SUBTITLE}; "
+        f"{AVATAR_WORDS_PER_SUB} with --avatar-split)",
     )
     p.add_argument(
         "--hook-duration",
@@ -438,9 +444,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--caption-style",
         choices=["classic", "box", "yellow_pop", "one_word"],
-        default=CAPTION_STYLE,
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
         help="Caption look: classic (original), box (word in a colored box), "
-             "yellow_pop (word turns yellow and pops), one_word (one big word at a time)",
+             "yellow_pop (word turns yellow and pops), one_word (one big word at a time) "
+             f"(default: {CAPTION_STYLE}; {AVATAR_CAPTION_STYLE} with --avatar-split)",
     )
     p.add_argument(
         "--caption-color",
@@ -449,9 +456,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--font-style",
-        default=ACTIVE_FONT_STYLE,
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
         choices=["DEFAULT", "STORYTELLER", "HORMOZI", "CINEMATIC"],
-        help="Font style preset",
+        help=f"Font style preset (default: {ACTIVE_FONT_STYLE}; {AVATAR_FONT_STYLE} with --avatar-split)",
     )
     p.add_argument(
         "--advanced-text",
@@ -899,6 +906,15 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
             parser.error("--avatar-split cannot be combined with --handoff (the handoff renders the clip clean).")
         if not 0.2 <= args.avatar_ratio <= 0.6:
             parser.error(f"--avatar-ratio must be between 0.2 and 0.6, got: {args.avatar_ratio}")
+
+    # Caption defaults depend on the layout; flags given explicitly are kept.
+    avatar = bool(args.avatar_split)
+    if not hasattr(args, "caption_style"):
+        args.caption_style = AVATAR_CAPTION_STYLE if avatar else CAPTION_STYLE
+    if not hasattr(args, "font_style"):
+        args.font_style = AVATAR_FONT_STYLE if avatar else ACTIVE_FONT_STYLE
+    if not hasattr(args, "words_per_sub"):
+        args.words_per_sub = AVATAR_WORDS_PER_SUB if avatar else MAX_WORDS_PER_SUBTITLE
 
     if args.handoff:
         if args.story_mode:

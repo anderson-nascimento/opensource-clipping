@@ -45,6 +45,7 @@ run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _resize_frame = utils._resize_frame
 SequentialFrameSampler = utils.SequentialFrameSampler
+interpolate_track = utils.interpolate_track
 _get_render_dims = utils._get_render_dims
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
@@ -573,6 +574,14 @@ def create_split_screen_video(
         print(f"      {spk}: {n_pts} pts, median_cx={med:.0f}, canonical={canon}, zoom={sz:.2f}x", flush=True)
 
     # ---- FASE 2: SMOOTH CAMERA PER SPEAKER (Centering CX) ----
+    # Snap if distance is > 8% of frame width (~150px). Crucial for instantly
+    # jumping perfectly to center during angle cuts (wide to tight shot)
+    # without slowly panning towards it.
+    snap_px = width * (SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08)
+    # A speaker only has samples where their face was found and assigned; across a longer
+    # gap the crop holds its last position instead of sliding over the background.
+    max_track_gap = DETECTION_STEP * 2.5
+
     def _smooth_positions(raw_list, spk_name):
         smooth_list = []
         if not raw_list:
@@ -593,14 +602,6 @@ def create_split_screen_video(
         # triggers tracking with a very small physical movement, keeping faces centered.
         deadzone_px = (crop_w_full * DEADZONE_RATIO) / cam_zoom
         
-        # Snap if distance is > 8% of frame width (~150px). Crucial for instantly
-        # Snap if distance is > 4% of frame width (~75px). Crucial for instantly
-        # jumping perfectly to center during angle cuts (wide to tight shot)
-        # without slowly panning towards it.
-        temp_snap = SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08
-        # temp_snap = SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.04
-        snap_px = width * temp_snap
-
         for d in raw_list:
             face_cx = d["cx"]
             face_cy = d["cy"]
@@ -622,29 +623,14 @@ def create_split_screen_video(
         spk: _smooth_positions(raw_data[spk], spk) for spk in all_speakers_in_clip
     }
 
+    smooth_times = {spk: [d["time"] for d in sd] for spk, sd in smooth.items()}
+
     def _get_pos_full(speaker: str, t: float) -> tuple[float, float, float]:
-        sd = smooth.get(speaker, [])
-        if not sd:
-            return width / 2, height / 2, 1.0
-        if t <= sd[0]["time"]:
-            return sd[0]["cx"], sd[0]["cy"], sd[0]["zoom"]
-        if t >= sd[-1]["time"]:
-            return sd[-1]["cx"], sd[-1]["cy"], sd[-1]["zoom"]
-        for i in range(len(sd) - 1):
-            if sd[i]["time"] <= t <= sd[i + 1]["time"]:
-                t1, t2 = sd[i]["time"], sd[i + 1]["time"]
-                cx1, cx2 = sd[i]["cx"], sd[i + 1]["cx"]
-                cy1, cy2 = sd[i]["cy"], sd[i + 1]["cy"]
-                z1, z2 = sd[i]["zoom"], sd[i + 1]["zoom"]
-                if t1 == t2:
-                    return cx1, cy1, z1
-                frac = (t - t1) / (t2 - t1)
-                return (
-                    cx1 + (cx2 - cx1) * frac,
-                    cy1 + (cy2 - cy1) * frac,
-                    z1 + (z2 - z1) * frac
-                )
-        return width / 2, height / 2, 1.0
+        pos = interpolate_track(
+            smooth.get(speaker, []), smooth_times.get(speaker, []), t,
+            ("cx", "cy", "zoom"), snap_px, max_track_gap,
+        )
+        return (width / 2, height / 2, 1.0) if pos is None else pos
 
     def _get_all_boxes(t):
         if not all_frame_data:
@@ -719,13 +705,11 @@ def create_split_screen_video(
         nonlocal switch_blend_t0
         smoothed_cx, smoothed_cy, _ = _get_pos_full(speaker, t)
         smoothed = (smoothed_cx, smoothed_cy)
-        if is_new_switch and speaker in last_speaker_pos:
-            cached = last_speaker_pos[speaker]
-            if SWITCH_BLEND_DUR <= 0:
-                result = cached
-            else:
-                switch_blend_t0 = t
-                result = cached
+        if is_new_switch and speaker in last_speaker_pos and SWITCH_BLEND_DUR > 0:
+            # Without a blend, a switch shows the current position: the cached one can be
+            # seconds old and showed for one frame at a stale spot after a camera change.
+            switch_blend_t0 = t
+            result = last_speaker_pos[speaker]
         elif SWITCH_BLEND_DUR > 0 and switch_blend_t0 >= 0 and (t - switch_blend_t0) < SWITCH_BLEND_DUR:
             frac = min(1.0, (t - switch_blend_t0) / SWITCH_BLEND_DUR)
             cached = last_speaker_pos.get(speaker, smoothed)

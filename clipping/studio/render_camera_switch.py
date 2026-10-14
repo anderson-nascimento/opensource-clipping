@@ -45,6 +45,7 @@ run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _resize_frame = utils._resize_frame
 SequentialFrameSampler = utils.SequentialFrameSampler
+interpolate_track = utils.interpolate_track
 _get_render_dims = utils._get_render_dims
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
@@ -61,6 +62,7 @@ def create_camera_switch_video(
     diarization_data,
     cfg,
     label="CameraSwitch",
+    broll_data=None,
 ):
     """
     Render a dynamic camera-switch video, which cuts between active speakers automatically.
@@ -70,11 +72,12 @@ def create_camera_switch_video(
         output_video (str): Path to output video file.
         start_clip (float): Subclip start boundary in seconds.
         end_clip (float): Subclip end boundary in seconds.
-        rasio (str): Output ratio string ('9:16' or '16:9').
+        ratio (str): Output ratio string ('9:16' or '16:9').
+        diarization_data (list or None): Speaker segments; None (e.g. a custom hook) shows
+            the blurred wide shot throughout.
         cfg: The runtime config containing camera-switch timing preferences.
         broll_data (list, optional): Data about B-roll sequences to blend in.
         label (str, optional): Progress reporting name.
-        segment_data (list, optional): The timeline of active speakers.
 
     Returns:
         callable: A function mapping timestamp to horizontal subtitle coordinate `get_x_final(t)`.
@@ -99,6 +102,8 @@ def create_camera_switch_video(
 
     video_encoder = detect_video_encoder(cfg)
 
+    if diarization_data is None:
+        diarization_data = []
     if broll_data is None:
         broll_data = []
 
@@ -341,6 +346,11 @@ def create_camera_switch_video(
     # ================================================================
     # FASE 2 — Smooth per-speaker camera positions
     # ================================================================
+    snap_px = width * SNAP_THRESHOLD
+    # A speaker only has samples where their face was found and assigned; across a longer
+    # gap the crop holds its last position instead of sliding over the background.
+    max_track_gap = DETECTION_STEP * 2.5
+
     def _smooth_positions_cs(raw_list):
         smooth_list = []
         if not raw_list:
@@ -375,8 +385,7 @@ def create_camera_switch_video(
         cam_zoom = _calc_target_zoom(initial_dist)
         
         deadzone_px = crop_w * DEADZONE_RATIO
-        snap_px = width * SNAP_THRESHOLD
-        
+
         for d in raw_list:
             face_cx = d["cx"]
             face_cy = d["cy"]
@@ -402,29 +411,14 @@ def create_camera_switch_video(
         spk: _smooth_positions_cs(raw_data[spk]) for spk in speakers
     }
 
+    smooth_times = {spk: [d["time"] for d in sd] for spk, sd in smooth.items()}
+
     def _get_pos_cs(speaker, t):
-        sd = smooth.get(speaker, [])
-        if not sd:
-            return width / 2, height / 2, 1.0
-        if t <= sd[0]["time"]:
-            return sd[0]["cx"], sd[0]["cy"], sd[0]["zoom"]
-        if t >= sd[-1]["time"]:
-            return sd[-1]["cx"], sd[-1]["cy"], sd[-1]["zoom"]
-        for i in range(len(sd) - 1):
-            if sd[i]["time"] <= t <= sd[i + 1]["time"]:
-                t1, t2 = sd[i]["time"], sd[i + 1]["time"]
-                cx1, cx2 = sd[i]["cx"], sd[i + 1]["cx"]
-                cy1, cy2 = sd[i]["cy"], sd[i + 1]["cy"]
-                z1, z2 = sd[i]["zoom"], sd[i + 1]["zoom"]
-                if t1 == t2:
-                    return cx1, cy1, z1
-                frac = (t - t1) / (t2 - t1)
-                return (
-                    cx1 + (cx2 - cx1) * frac,
-                    cy1 + (cy2 - cy1) * frac,
-                    z1 + (z2 - z1) * frac
-                )
-        return width / 2, height / 2, 1.0
+        pos = interpolate_track(
+            smooth.get(speaker, []), smooth_times.get(speaker, []), t,
+            ("cx", "cy", "zoom"), snap_px, max_track_gap,
+        )
+        return (width / 2, height / 2, 1.0) if pos is None else pos
 
     # ----------------------------------------------------------------
     # Helper: blurred pillarbox for wide-shot / simultaneous speech
@@ -505,14 +499,11 @@ def create_camera_switch_video(
         """Return (cx, cy, zoom) with anti-sliding cache + optional blend."""
         nonlocal switch_blend_t0
         smoothed = _get_pos_cs(speaker, t)
-        if is_new_switch and speaker in last_speaker_pos:
-            cached = last_speaker_pos[speaker]
-            if SWITCH_BLEND_DUR <= 0:
-                # Instant snap
-                result = cached
-            else:
-                switch_blend_t0 = t
-                result = cached
+        if is_new_switch and speaker in last_speaker_pos and SWITCH_BLEND_DUR > 0:
+            # Without a blend, a switch shows the current position: the cached one can be
+            # seconds old and showed for one frame at a stale spot after a camera change.
+            switch_blend_t0 = t
+            result = last_speaker_pos[speaker]
         elif SWITCH_BLEND_DUR > 0 and switch_blend_t0 >= 0 and (t - switch_blend_t0) < SWITCH_BLEND_DUR:
             # Still blending from cached → smoothed
             frac = min(1.0, (t - switch_blend_t0) / SWITCH_BLEND_DUR)

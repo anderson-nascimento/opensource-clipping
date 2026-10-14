@@ -47,6 +47,7 @@ utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _get_cv2_interpolation = utils._get_cv2_interpolation
 _resize_frame = utils._resize_frame
 SequentialFrameSampler = utils.SequentialFrameSampler
+interpolate_track = utils.interpolate_track
 _get_render_dims = utils._get_render_dims
 _is_vertical_ratio = utils._is_vertical_ratio
 RATIO_MAP = utils.RATIO_MAP
@@ -335,20 +336,13 @@ def create_hybrid_video(
         raw_data, crop_w, width, DEADZONE_RATIO, SMOOTH_FACTOR, SNAP_THRESHOLD, TRACK_HOLD, SNAP_CONFIRM
     )
 
+    # A cut (a jump of at least the snap distance) steps between samples instead of panning.
+    smooth_times = [d["time"] for d in smooth_data]
+    cut_px = width * (SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08)
+
     def get_x(t):
-        if not smooth_data:
-            return default_cx
-        if t <= smooth_data[0]["time"]:
-            return smooth_data[0]["cx"]
-        if t >= smooth_data[-1]["time"]:
-            return smooth_data[-1]["cx"]
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                cx1, cx2 = smooth_data[i]["cx"], smooth_data[i + 1]["cx"]
-                if t1 == t2: return cx1
-                return cx1 + (cx2 - cx1) * (t - t1) / (t2 - t1)
-        return default_cx
+        pos = interpolate_track(smooth_data, smooth_times, t, ("cx",), cut_px)
+        return default_cx if pos is None else pos[0]
 
     def get_box(t):
         if not raw_data:
@@ -363,26 +357,8 @@ def create_hybrid_video(
         return None
 
     def _get_pos(t):
-        if not smooth_data:
-            return default_cx, default_cy
-        if t <= smooth_data[0]["time"]:
-            return smooth_data[0]["cx"], smooth_data[0]["cy"]
-        if t >= smooth_data[-1]["time"]:
-            return smooth_data[-1]["cx"], smooth_data[-1]["cy"]
-
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                cx1, cx2 = smooth_data[i]["cx"], smooth_data[i + 1]["cx"]
-                cy1, cy2 = smooth_data[i]["cy"], smooth_data[i + 1]["cy"]
-                if t1 == t2:
-                    return cx1, cy1
-                frac = (t - t1) / (t2 - t1)
-                return (
-                    cx1 + (cx2 - cx1) * frac,
-                    cy1 + (cy2 - cy1) * frac
-                )
-        return default_cx, default_cy
+        pos = interpolate_track(smooth_data, smooth_times, t, ("cx", "cy"), cut_px)
+        return (default_cx, default_cy) if pos is None else pos
 
     def format_seconds(s):
         mins = int(s) // 60

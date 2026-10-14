@@ -314,6 +314,11 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Whisper model size ([see here](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper) for options) |
 | `--whisper-device` | `cuda` | Whisper device (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float32`, `float16`, `int8`, etc.) |
+| `--transcriber` | `local` | `local` (Faster-Whisper) or `groq` (Groq Whisper API, needs `GROQ_API_KEY`; no GPU needed, falls back to local Whisper if the API fails) |
+| `--transcriber-model` | `whisper-large-v3` | Groq model (`whisper-large-v3` or the cheaper `whisper-large-v3-turbo`) |
+| `--transcriber-language` | auto | Spoken language for the API as an ISO-639-1 code (e.g. `pt`) |
+| `--transcriber-chunk-minutes` | `20` | Audio longer than this is split at silences before upload |
+| `--no-transcript-cache` | — | Transcribe again. By default the transcript is saved next to the source video (`original_video.mp4.transcript.json`) and reused when the same video is run with the same transcription settings, so a re-run after a failed AI analysis does not pay for the API again |
 | `--gemini-model` | `gemini-3.1-flash-lite` | Gemini model name |
 | `--gemini-fallback-model` | `gemini-3.8-flash` | Gemini fallback model name if main model fails |
 | `--lang` | `en` | Language for all generated metadata: titles, captions, hashtags and thumbnail (e.g. `en`, `pt-BR`, `es`) |

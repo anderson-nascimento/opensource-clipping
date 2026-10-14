@@ -60,7 +60,7 @@ def _probe_duration(path: str) -> float:
             "-of", "default=noprint_wrappers=1:nokey=1", path,
         ],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         check=True,
     )
     return float(out.stdout.strip())
@@ -277,11 +277,80 @@ def transcribe_api(
     return full_transcript, transcript_segments
 
 
+def _cache_path(video_path: str) -> str:
+    return video_path + ".transcript.json"
+
+
+def _cache_key(video_path: str, cfg) -> dict:
+    """
+    What the transcript depends on: the video file (its download source, size and
+    mtime) and the transcription settings. Any change makes the cached copy stale.
+    """
+    try:
+        with open(video_path + ".source", encoding="utf-8") as f:
+            source = f.read()
+    except OSError:
+        source = ""
+    st = os.stat(video_path)
+    transcriber = getattr(cfg, "transcriber", "local")
+    return {
+        "source": source,
+        "size": st.st_size,
+        "mtime_ns": st.st_mtime_ns,
+        "transcriber": transcriber,
+        "model": (getattr(cfg, "transcriber_model", None) if transcriber != "local" else cfg.whisper_model),
+        "language": getattr(cfg, "transcriber_language", None),
+        "max_words_per_subtitle": cfg.max_words_per_subtitle,
+    }
+
+
+def load_cached_transcript(video_path: str, cfg):
+    """The saved ``(full_transcript, transcript_segments)`` for this video and settings, or None."""
+    try:
+        with open(_cache_path(video_path), encoding="utf-8") as f:
+            cached = json.load(f)
+        if cached.get("key") == _cache_key(video_path, cfg) and cached.get("segments"):
+            return cached["full_transcript"], cached["segments"]
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def save_cached_transcript(video_path: str, cfg, full_transcript: str, segments: list[dict]) -> None:
+    try:
+        with open(_cache_path(video_path), "w", encoding="utf-8") as f:
+            json.dump(
+                {"key": _cache_key(video_path, cfg), "full_transcript": full_transcript, "segments": segments},
+                f, ensure_ascii=False,
+            )
+    except OSError as e:
+        print(f"⚠️ Could not save the transcript cache: {e}")
+
+
 def transcribe_with_fallback(video_path: str, cfg, whisper_model_instance=None) -> tuple[str, list[dict]]:
     """
     Transcribe with ``cfg.transcriber`` ("local" or an API provider); if the
     API fails, fall back to local Faster-Whisper.
+
+    The result is cached next to the video, so a re-run of the same video with the
+    same settings (e.g. after the AI analysis failed) does not pay for the API again.
     """
+    if getattr(cfg, "transcript_cache", True):
+        cached = load_cached_transcript(video_path, cfg)
+        if cached:
+            print(
+                f"[2/3] ♻️ Reusing the saved transcript ({os.path.basename(_cache_path(video_path))}); "
+                "pass --no-transcript-cache to transcribe again."
+            )
+            return cached
+
+    full_transcript, segments = _transcribe(video_path, cfg, whisper_model_instance)
+    if segments:
+        save_cached_transcript(video_path, cfg, full_transcript, segments)
+    return full_transcript, segments
+
+
+def _transcribe(video_path: str, cfg, whisper_model_instance=None) -> tuple[str, list[dict]]:
     from . import engine
 
     transcriber = getattr(cfg, "transcriber", "local")

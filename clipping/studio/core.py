@@ -773,7 +773,7 @@ def process_clip(
                     "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                     "-ss", str(m_start), "-i", cfg.original_video_file,
                     "-vframes", "1", "-q:v", "2", frame_path
-                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
             except subprocess.CalledProcessError as e:
                 raise RuntimeError(f"Failed to extract first frame for VO Intro:\n{e.stderr}")
             
@@ -782,7 +782,7 @@ def process_clip(
                 res = subprocess.run([
                     "ffprobe", "-v", "error", "-show_entries", "format=duration",
                     "-of", "default=noprint_wrappers=1:nokey=1", vo_data["audio_path"]
-                ], stdout=subprocess.PIPE, text=True, check=True)
+                ], stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", check=True)
                 vo_duration = float(res.stdout.strip()) + 0.5
             except Exception:
                 vo_duration = float(vo_data["segments"][-1]["end"]) + 0.5 if vo_data.get("segments") else 5.0
@@ -972,7 +972,7 @@ def process_clip(
                 cmd_vo_base.append(output_vo_ts)
                 
                 try:
-                    subprocess.run(cmd_vo_base, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                    subprocess.run(cmd_vo_base, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
                 except subprocess.CalledProcessError as e:
                     raise RuntimeError(f"FFmpeg VO intro failed (Rank {rank}):\nCommand: {' '.join(cmd_vo_base)}\nError:\n{e.stderr}")
                 
@@ -1052,7 +1052,7 @@ def process_clip(
                     dur_res = subprocess.run([
                         "ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "default=noprint_wrappers=1:nokey=1", final_path
-                    ], stdout=subprocess.PIPE, text=True, check=True)
+                    ], stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", check=True)
                     clip_dur = float(dur_res.stdout.strip())
                 except Exception:
                     clip_dur = 60.0
@@ -1099,7 +1099,7 @@ def process_clip(
                 cmd_glow.append(tmp_glowed)
 
                 try:
-                    subprocess.run(cmd_glow, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                    subprocess.run(cmd_glow, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
                     os.replace(tmp_glowed, final_path)
                     print(f"   ✅ [Edge Glow] Applied to {os.path.basename(final_path)}")
                 except subprocess.CalledProcessError as e:
@@ -1146,4 +1146,9 @@ def process_clip(
 
         for f_path in files_to_remove:
             if os.path.exists(f_path):
-                os.remove(f_path)
+                try:
+                    os.remove(f_path)
+                except OSError as e:
+                    # A file still held open (e.g. by antivirus scanning) must not hide
+                    # the clip's real result or error.
+                    print(f"   ⚠️ Could not remove temp file {f_path}: {e}")

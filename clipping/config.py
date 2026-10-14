@@ -511,6 +511,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="ISO-639-1 code of the spoken language for the API (e.g. pt); default: auto-detect",
     )
     p.add_argument(
+        "--no-transcript-cache",
+        action="store_true",
+        help="Transcribe again even when a saved transcript of the same video and settings exists",
+    )
+    p.add_argument(
         "--transcriber-chunk-minutes",
         type=float,
         default=TRANSCRIBER_CHUNK_MINUTES,
@@ -1060,6 +1065,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         transcriber_model=args.transcriber_model,
         transcriber_language=args.transcriber_language,
         transcriber_chunk_minutes=args.transcriber_chunk_minutes,
+        transcript_cache=not args.no_transcript_cache,
         # AI
         ai_provider=args.ai_provider,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),

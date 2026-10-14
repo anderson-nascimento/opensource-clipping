@@ -8,6 +8,13 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [Unreleased]
+
+### Fixed
+- **`--camera-switch` crashed before rendering**: The renderer did not accept the `broll_data` argument the pipeline passes (TypeError on the main clip, UnboundLocalError on the hook), and a custom hook passed no speaker data. Camera-switch mode now renders; a custom hook shows the blurred wide shot.
+- **Crop panning across the background at camera cuts and while a face is missing**: Between two face samples the crop moved in a straight line, so a cut to another face or angle became a quick pan (hybrid, split-screen and camera-switch), and in split-screen and camera-switch a speaker whose face was not seen for a while slid slowly across the frame. Cuts now step, and across gaps the crop holds its last position until the face is seen again. On a 55s test, the hybrid crop had 9 panning steps around 5 camera cuts before and none after.
+- **One frame at a stale position after switching speakers** (split-screen full layout and camera-switch, with the default `--switch-blend-duration 0`): the first frame used the speaker's position from when they were last shown, which can be seconds old.
+
 ## [v3.2.0] - 2026-10-13
 
 ### Added

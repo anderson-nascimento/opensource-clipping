@@ -7,6 +7,7 @@ Maps to Cell 2 (The Engine) of the notebook.
 import json
 import os
 import re
+import threading
 import time
 
 from yt_dlp import YoutubeDL
@@ -530,6 +531,25 @@ def _is_retryable(exc: Exception) -> bool:
     return any(k in msg for k in keywords)
 
 
+HEARTBEAT_SECONDS = 30
+
+
+def _generate_with_heartbeat(client, model, contents, config):
+    """Call generate_content, printing a line every HEARTBEAT_SECONDS so a slow response doesn't look like a hang."""
+    done = threading.Event()
+    t0 = time.time()
+
+    def beat():
+        while not done.wait(HEARTBEAT_SECONDS):
+            print(f"[Gemini] Still waiting for {model}... {time.time() - t0:.0f}s", flush=True)
+
+    threading.Thread(target=beat, daemon=True).start()
+    try:
+        return client.models.generate_content(model=model, contents=contents, config=config)
+    finally:
+        done.set()
+
+
 def _generate_json_with_retry(client, model, fallback_model, contents, config):
     last_exc = None
     status_code = None
@@ -538,11 +558,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
         try:
             print(f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS}...")
 
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            )
+            response = _generate_with_heartbeat(client, model, contents, config)
 
             text = getattr(response, "text", None)
             if not text or not text.strip():
@@ -571,11 +587,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
     if fallback_model:
         print(f"[Gemini] Trying once more with fallback model ({fallback_model})...")
         try:
-            response = client.models.generate_content(
-                model=fallback_model,
-                contents=contents,
-                config=config,
-            )
+            response = _generate_with_heartbeat(client, fallback_model, contents, config)
             text = getattr(response, "text", None)
             if not text or not text.strip():
                 raise ValueError("Gemini fallback returned an empty response.text.")

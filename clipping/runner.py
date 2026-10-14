@@ -9,7 +9,7 @@ import json
 import os
 
 from . import diarization as diarization_mod
-from . import engine, metadata, studio, hook_manager, voiceover
+from . import engine, metadata, studio, hook_manager, transcribe_api, voiceover
 
 
 def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
@@ -73,13 +73,8 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
                 )
 
     if not full_transcript or not transcript_segments:
-        full_transcript, transcript_segments = engine.transcribe_video(
-            cfg.original_video_file,
-            max_words_per_subtitle=cfg.max_words_per_subtitle,
-            model_size=cfg.whisper_model,
-            device=cfg.whisper_device,
-            compute_type=cfg.whisper_compute_type,
-            whisper_model_instance=whisper_model_instance,
+        full_transcript, transcript_segments = transcribe_api.transcribe_with_fallback(
+            cfg.original_video_file, cfg, whisper_model_instance=whisper_model_instance
         )
 
     # Step 3 — Gemini AI analysis

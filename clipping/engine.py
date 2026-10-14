@@ -133,6 +133,48 @@ def _apply_cookies(opts: dict, cookies: str | None) -> None:
         opts["cookiesfrombrowser"] = (cookies, None, None, None)
 
 
+def _source_marker(output_path: str) -> str:
+    return output_path + ".source"
+
+
+def _source_key(url: str, download_source_height) -> str:
+    return f"{url} @ {download_source_height}"
+
+
+def _reuse_or_clear_download(url: str, output_path: str, download_source_height) -> bool:
+    """
+    Return True when *output_path* already holds this URL at this quality (a re-run).
+
+    The output path is fixed (``original_video.mp4``) and yt-dlp skips a download whose
+    file already exists, so a run with a new URL silently reused the previous video.
+    A marker file next to the video records its source; a different (or unknown) source
+    removes the old video and its subtitles before downloading.
+    """
+    import glob
+
+    marker = _source_marker(output_path)
+    key = _source_key(url, download_source_height)
+    if not os.path.exists(output_path):
+        return False
+    try:
+        with open(marker, encoding="utf-8") as f:
+            if f.read() == key:
+                return True
+    except OSError:
+        pass
+    stale = [output_path, marker] + glob.glob(output_path.replace(".mp4", ".*.json3"))
+    for path in stale:
+        if os.path.exists(path):
+            os.remove(path)
+    print("      🧹 Removed the previous source video (different URL or quality).", flush=True)
+    return False
+
+
+def _write_source_marker(url: str, output_path: str, download_source_height) -> None:
+    with open(_source_marker(output_path), "w", encoding="utf-8") as f:
+        f.write(_source_key(url, download_source_height))
+
+
 def download_video(
     url: str,
     output_path: str,
@@ -159,6 +201,10 @@ def download_video(
     else:
         print(f"      🎯 Source quality: up to {download_source_height}p", flush=True)
 
+    if _reuse_or_clear_download(url, output_path, download_source_height):
+        print("      ♻️ Source video for this URL already downloaded, reusing it.", flush=True)
+        return
+
     # --- Google Drive: use gdown instead of yt-dlp ---
     if source_platform == "gdrive":
         _download_gdrive(url, output_path)
@@ -167,6 +213,7 @@ def download_video(
                 f"❌ Google Drive download failed — file not found at {output_path}"
             )
         print(f"      ✅ Video downloaded successfully from Google Drive.", flush=True)
+        _write_source_marker(url, output_path, download_source_height)
         return
 
     # --- Build yt-dlp options per platform ---
@@ -251,6 +298,7 @@ def download_video(
             f"❌ Download from {platform_label} failed — video file not found at {output_path}.\n"
             "      Make sure the URL is valid and publicly accessible."
         )
+    _write_source_marker(url, output_path, download_source_height)
 
 
 # ==============================================================================

@@ -275,10 +275,10 @@ python main.py --help
 | `--video-preset` | `auto` | Encoder preset override (NVENC: `p1`-`p7`, x264: `ultrafast`-`veryslow`). Use `auto` for default. |
 | `--video-encoder` | `auto` | Video encoder: `auto` tries NVIDIA NVENC, Intel Quick Sync (`qsv`), AMD AMF, VAAPI, then CPU `libx264`. Force one with `nvenc`, `qsv`, `amf`, `vaapi` or `cpu`. |
 | `--video-scale-algo` | `bicubic` | Resize algorithm for render (`bicubic`: balanced and fast, `lanczos`: sharpest but ~4.5x slower, `area`/`bilinear`: fastest/softer) |
-| `--words-per-sub` | `5` | Max words per karaoke subtitle group |
+| `--words-per-sub` | `5` | Max words per karaoke subtitle group (`3` with `--avatar-split`) |
 | `--hook-duration` | `3` | Hook teaser duration (seconds) |
-| `--font-style` | `HORMOZI` | Font preset (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`) |
-| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time) |
+| `--font-style` | `HORMOZI` | Font preset (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`); `CINEMATIC` with `--avatar-split` |
+| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time); `box` with `--avatar-split` |
 | `--caption-color` | — | Accent color for `--caption-style` as `#RRGGBB` |
 | `--no-broll` | — | Disable B-roll footage |
 | `--no-hook` | — | Disable the hook teaser |
@@ -490,6 +490,9 @@ python main.py --url "VIDEO_URL" --avatar-split assets/avatar/my-avatar-loop.mp4
 
 - The avatar can be a **video** (looped for the whole clip) or an **image** (stays still).
   Either is scaled to cover its panel (1080x864 by default) and center-cropped.
+- Captions default to `--caption-style box --font-style CINEMATIC --words-per-sub 3` in this
+  layout (condensed text that fits the band above the seam on one line); any of these flags
+  given explicitly wins.
 - `--avatar-position top` puts the avatar on top; `--avatar-ratio` (0.2–0.6, default 0.45)
   sets its share of the frame height.
 - Hook, B-roll (over the clip panel), music and watermark work as usual. Not combinable with

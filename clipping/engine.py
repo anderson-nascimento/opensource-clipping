@@ -178,6 +178,9 @@ def download_video(
             "quiet": True,
             "merge_output_format": "mp4",
             "remote_components": ["ejs:github"],
+            # YouTube's signature challenges need a JS runtime; yt-dlp only enables deno by
+            # default, so also accept node (already installed locally and on Colab).
+            "js_runtimes": {"deno": {}, "node": {}},
             "progress_hooks": [_ydl_progress_hook],
             "extractor_args": {"youtube": ["player_client=android,web"]},
         }

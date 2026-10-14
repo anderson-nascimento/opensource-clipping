@@ -146,6 +146,8 @@ BGM_DIR = os.path.abspath(os.path.join(BASE_DIR, "assets", "bgm"))
 WHISPER_MODEL = "large-v3"
 WHISPER_DEVICE = "cuda"
 WHISPER_COMPUTE_TYPE = "float16"
+TRANSCRIBER = "local"  # "local" (Faster-Whisper) or "groq" (hosted Whisper API)
+TRANSCRIBER_CHUNK_MINUTES = 20
 DOWNLOAD_SOURCE_HEIGHT = "max"
 VIDEO_QUALITY_CQ = 23
 VIDEO_QUALITY_CRF = 20
@@ -458,6 +460,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--whisper-compute-type",
         default=WHISPER_COMPUTE_TYPE,
         help="Compute type for Whisper (float16, int8, etc.)",
+    )
+    p.add_argument(
+        "--transcriber",
+        default=TRANSCRIBER,
+        choices=["local", "groq"],
+        help="Where to transcribe: local Faster-Whisper, or the Groq Whisper API "
+        "(needs GROQ_API_KEY; falls back to local Whisper if the API fails)",
+    )
+    p.add_argument(
+        "--transcriber-model",
+        default=None,
+        help="API model (groq: whisper-large-v3 [default] or whisper-large-v3-turbo)",
+    )
+    p.add_argument(
+        "--transcriber-language",
+        default=None,
+        help="ISO-639-1 code of the spoken language for the API (e.g. pt); default: auto-detect",
+    )
+    p.add_argument(
+        "--transcriber-chunk-minutes",
+        type=float,
+        default=TRANSCRIBER_CHUNK_MINUTES,
+        help="Split audio longer than this into chunks (cut at silences) before sending to the API",
     )
 
     # --- Gemini & Face Detection ---
@@ -968,6 +993,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_model=args.whisper_model,
         whisper_device=args.whisper_device,
         whisper_compute_type=args.whisper_compute_type,
+        transcriber=args.transcriber,
+        transcriber_model=args.transcriber_model,
+        transcriber_language=args.transcriber_language,
+        transcriber_chunk_minutes=args.transcriber_chunk_minutes,
         # AI
         ai_provider=args.ai_provider,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),

@@ -49,7 +49,10 @@ def _print_banner(cfg, version, url, idx=None, total=None):
     if cfg.use_split_screen:
         print(f"   Dynamic Split: {'ON' if cfg.use_dynamic_split else 'OFF'}")
         print(f"   Split Trigger: {cfg.split_trigger}")
-    print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
+    if cfg.transcriber == "local":
+        print(f"   Whisper     : {cfg.whisper_model} ({cfg.whisper_device})")
+    else:
+        print(f"   Transcriber : {cfg.transcriber} API ({cfg.transcriber_model or 'default model'})")
     print(f"   Gemini      : {cfg.gemini_model}")
     print(f"   Language    : {cfg.content_lang}")
     if getattr(cfg, "watermark_enabled", False):
@@ -165,17 +168,19 @@ def main():
     t_batch_start = time.time()
     
     # Pre-load Whisper model for batch mode to avoid reloading per URL
+    # (skipped when transcribing via API: the local model then loads only on fallback)
     global_whisper_model = None
-    try:
-        from faster_whisper import WhisperModel
-        print(f"⏳ Pre-loading Whisper model '{cfg.whisper_model}' for batch processing...")
-        global_whisper_model = WhisperModel(
-            cfg.whisper_model, 
-            device=cfg.whisper_device, 
-            compute_type=cfg.whisper_compute_type
-        )
-    except Exception as e:
-        print(f"⚠️ Failed to pre-load Whisper model: {e}")
+    if cfg.transcriber == "local":
+        try:
+            from faster_whisper import WhisperModel
+            print(f"⏳ Pre-loading Whisper model '{cfg.whisper_model}' for batch processing...")
+            global_whisper_model = WhisperModel(
+                cfg.whisper_model, 
+                device=cfg.whisper_device, 
+                compute_type=cfg.whisper_compute_type
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to pre-load Whisper model: {e}")
 
     for idx, url in enumerate(url_list):
         t_start = time.time()

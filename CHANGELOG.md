@@ -21,6 +21,7 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Gemini analysis no longer looks stuck**: While waiting for Gemini (a free-tier response can take several minutes), the console prints `[Gemini] Still waiting for <model>... <n>s` every 30 seconds.
 
 ### Fixed
+- **yt-dlp "No supported JavaScript runtime" warning**: YouTube downloads now also accept Node.js as the JS runtime (yt-dlp only enables Deno by default), so the signature challenges are solved and no formats go missing.
 - **Download failing on Windows with WinError 32**: Antivirus real-time scanning (e.g. Defender) briefly locks a freshly downloaded file, and yt-dlp gave up renaming the finished `.part` file after 3 instant retries. It now retries up to 10 times with growing waits (about 1 minute).
 - **Face tracking stuck after a camera cut**: In the default (hybrid) renderer, a cut to a new face that arrived less than `--track-hold` seconds after the previous cut was dropped for good, leaving the crop on an empty part of the frame (e.g. a plant) until the face moved again. Such cuts are now delayed to the end of the hold instead. Camera cuts in the source are detected from frame differences and re-frame immediately, and samples with no face keep the camera still instead of pulling it to the center.
 

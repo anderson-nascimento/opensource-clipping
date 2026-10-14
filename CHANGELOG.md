@@ -8,7 +8,7 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
-## [Unreleased]
+## [v3.2.0] - 2026-10-13
 
 ### Added
 - **HyperFrames Handoff (`--handoff`)**: Renders each clip clean (9:16 reframe, no captions, hook, B-roll, music, watermark or glow) and exports a package to `outputs/handoff/rank_<n>/`: `BRIEF.md`, `STYLE.md`, a word-level `transcript.json` on the clip timeline (also correct for multi-segment clips), the AI plan, image ideas, and a `public/` folder with a seekable 30 fps copy of the clip, GSAP, Anton/Inter fonts and 8 SFX (cached in `.cache/handoff/`).
@@ -20,7 +20,10 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 ### Changed
 - **Gemini analysis no longer looks stuck**: While waiting for Gemini (a free-tier response can take several minutes), the console prints `[Gemini] Still waiting for <model>... <n>s` every 30 seconds.
 
+- **`/clip-recut` QA catches dead air**: Besides the hero-time snapshots, the QA step sweeps the whole timeline evenly (24 frames) to find panels that sit empty or frozen before their first element arrives.
+
 ### Fixed
+- **`/clip-recut` captions one frame short**: `captions.py` floored durations like 23.133333s to 693 frames (ffprobe prints 6 decimals); a small epsilon now rounds them correctly.
 - **yt-dlp "No supported JavaScript runtime" warning**: YouTube downloads now also accept Node.js as the JS runtime (yt-dlp only enables Deno by default), so the signature challenges are solved and no formats go missing.
 - **Download failing on Windows with WinError 32**: Antivirus real-time scanning (e.g. Defender) briefly locks a freshly downloaded file, and yt-dlp gave up renaming the finished `.part` file after 3 instant retries. It now retries up to 10 times with growing waits (about 1 minute).
 - **Face tracking stuck after a camera cut**: In the default (hybrid) renderer, a cut to a new face that arrived less than `--track-hold` seconds after the previous cut was dropped for good, leaving the crop on an empty part of the frame (e.g. a plant) until the face moved again. Such cuts are now delayed to the end of the hold instead. Camera cuts in the source are detected from frame differences and re-frame immediately, and samples with no face keep the camera still instead of pulling it to the center.

@@ -37,6 +37,7 @@ USE_SPLIT_SCREEN = False
 USE_CAMERA_SWITCH = False
 DIARIZATION_NUM_SPEAKERS = "auto"
 SWITCH_HOLD_DURATION = 2.0
+AVATAR_RATIO = 0.45  # share of the 9:16 frame height taken by the avatar (--avatar-split)
 SWITCH_BLEND_DURATION = 0.0  # 0 = instant snap, >0 = smooth blend in seconds
 
 # Source Platform
@@ -364,6 +365,30 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=SWITCH_BLEND_DURATION,
         help="Blend duration when switching speakers (0 = instant snap, 0.2 = smooth 200ms transition). Default is 0 (instant snap).",
+    )
+    p.add_argument(
+        "--avatar-split",
+        metavar="FILE",
+        default=None,
+        help="Split the 9:16 frame between the face-tracked clip and your channel avatar: a video "
+        "(looped for the whole clip) or an image. Not combinable with --split-screen or --camera-switch.",
+    )
+    p.add_argument(
+        "--avatar-position",
+        choices=["bottom", "top"],
+        default="bottom",
+        help="Where the avatar goes with --avatar-split",
+    )
+    p.add_argument(
+        "--avatar-ratio",
+        type=float,
+        default=AVATAR_RATIO,
+        help="Share of the frame height taken by the avatar with --avatar-split (0.2-0.6)",
+    )
+    p.add_argument(
+        "--avatar-label",
+        default="",
+        help='Channel label drawn on the seam with --avatar-split, e.g. "@mychannel" (default: none)',
     )
     p.add_argument(
         "--no-subs",
@@ -863,6 +888,18 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     # Normalize URL list for batch support
     url_list = args.url if isinstance(args.url, list) else ([args.url] if args.url else [])
 
+    if args.avatar_split:
+        if not os.path.isfile(args.avatar_split):
+            parser.error(f"--avatar-split file not found: {args.avatar_split}")
+        if args.ratio != "9:16":
+            parser.error("--avatar-split needs --ratio 9:16.")
+        if args.split_screen or args.camera_switch:
+            parser.error("--avatar-split cannot be combined with --split-screen or --camera-switch.")
+        if args.handoff:
+            parser.error("--avatar-split cannot be combined with --handoff (the handoff renders the clip clean).")
+        if not 0.2 <= args.avatar_ratio <= 0.6:
+            parser.error(f"--avatar-ratio must be between 0.2 and 0.6, got: {args.avatar_ratio}")
+
     if args.handoff:
         if args.story_mode:
             parser.error("--handoff does not support --story-mode.")
@@ -954,6 +991,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         use_dynamic_split=args.dynamic_split,
         split_trigger=args.split_trigger,
         use_camera_switch=args.camera_switch,
+        avatar_split=os.path.abspath(args.avatar_split) if args.avatar_split else None,
+        avatar_position=args.avatar_position,
+        avatar_ratio=args.avatar_ratio,
+        avatar_label=args.avatar_label,
         diarization_num_speakers=args.diarization_speakers,
         switch_hold_duration=args.switch_hold_duration,
         switch_blend_duration=args.switch_blend_duration,
@@ -971,7 +1012,13 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         use_advanced_text_on_hook=args.advanced_text_hook,
         # ASS position values
         ass_align_916=ASS_ALIGN_916,
-        ass_margin_916=ASS_MARGIN_916,
+        # With the avatar at the bottom, captions sit just above the seam (and its label)
+        # instead of over the avatar's face.
+        ass_margin_916=(
+            int(1920 * args.avatar_ratio) + 70
+            if args.avatar_split and args.avatar_position == "bottom"
+            else ASS_MARGIN_916
+        ),
         ass_font_916=ASS_FONT_916,
         special_word_scale_916=SPECIAL_WORD_SCALE_916,
         ass_align_169=ASS_ALIGN_169,

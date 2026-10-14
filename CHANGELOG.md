@@ -10,6 +10,9 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 
 ## [Unreleased]
 
+### Added
+- **Avatar split (`--avatar-split FILE`)**: The TikTok-style layout of a clip plus the channel's avatar. The face-tracked clip fills the top panel (1080x1056, a wider crop than 9:16) and the avatar fills the bottom 45%: a video loops for the whole clip, an image stays still, both scaled to cover the panel. `--avatar-label "@channel"` draws a white label on the seam, and captions move just above it so they never cover the avatar's face. The README has a Google Flow image-to-video prompt to turn a still avatar into an idle loop. `--avatar-position top` and `--avatar-ratio` (0.2-0.6) change the layout. Works with the hook, B-roll (over the clip panel), music and watermark; not combinable with `--split-screen`, `--camera-switch` or `--handoff`.
+
 ### Fixed
 - **`--camera-switch` crashed before rendering**: The renderer did not accept the `broll_data` argument the pipeline passes (TypeError on the main clip, UnboundLocalError on the hook), and a custom hook passed no speaker data. Camera-switch mode now renders; a custom hook shows the blurred wide shot.
 - **Crop panning across the background at camera cuts and while a face is missing**: Between two face samples the crop moved in a straight line, so a cut to another face or angle became a quick pan (hybrid, split-screen and camera-switch), and in split-screen and camera-switch a speaker whose face was not seen for a while slid slowly across the frame. Cuts now step, and across gaps the crop holds its last position until the face is seen again. On a 55s test, the hybrid crop had 9 panning steps around 5 camera cuts before and none after.

@@ -146,6 +146,8 @@ BGM_DIR = os.path.abspath(os.path.join(BASE_DIR, "assets", "bgm"))
 WHISPER_MODEL = "large-v3"
 WHISPER_DEVICE = "cuda"
 WHISPER_COMPUTE_TYPE = "float16"
+TRANSCRIBER = "local"  # "local" (Faster-Whisper) or "groq" (hosted Whisper API)
+TRANSCRIBER_CHUNK_MINUTES = 20
 DOWNLOAD_SOURCE_HEIGHT = "max"
 VIDEO_QUALITY_CQ = 23
 VIDEO_QUALITY_CRF = 20
@@ -316,6 +318,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--no-bgm", action="store_true", help="Disable background music")
     p.add_argument(
+        "--handoff",
+        action="store_true",
+        help="Render clean 9:16 clips (no captions, hook, B-roll, music, watermark or glow) and export one "
+        "HyperFrames handoff package per clip to outputs/handoff/, for the Claude Code skill /clip-recut",
+    )
+    p.add_argument(
         "--bgm-mode",
         choices=["ducking", "background"],
         default=BGM_MODE,
@@ -452,6 +460,29 @@ def _build_parser() -> argparse.ArgumentParser:
         "--whisper-compute-type",
         default=WHISPER_COMPUTE_TYPE,
         help="Compute type for Whisper (float16, int8, etc.)",
+    )
+    p.add_argument(
+        "--transcriber",
+        default=TRANSCRIBER,
+        choices=["local", "groq"],
+        help="Where to transcribe: local Faster-Whisper, or the Groq Whisper API "
+        "(needs GROQ_API_KEY; falls back to local Whisper if the API fails)",
+    )
+    p.add_argument(
+        "--transcriber-model",
+        default=None,
+        help="API model (groq: whisper-large-v3 [default] or whisper-large-v3-turbo)",
+    )
+    p.add_argument(
+        "--transcriber-language",
+        default=None,
+        help="ISO-639-1 code of the spoken language for the API (e.g. pt); default: auto-detect",
+    )
+    p.add_argument(
+        "--transcriber-chunk-minutes",
+        type=float,
+        default=TRANSCRIBER_CHUNK_MINUTES,
+        help="Split audio longer than this into chunks (cut at silences) before sending to the API",
     )
 
     # --- Gemini & Face Detection ---
@@ -659,6 +690,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable AI segment trimming (render full start-to-end instead of keep_segments).",
     )
     hook_v2_group.add_argument(
+        "--no-snap-cuts",
+        action="store_true",
+        default=False,
+        help="Keep the AI's clip start/end as is instead of moving them to the nearest sentence "
+        "boundary (word timestamps), which avoids clips opening or ending mid-sentence.",
+    )
+    hook_v2_group.add_argument(
         "--silence-trim",
         action="store_true",
         default=False,
@@ -825,6 +863,14 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     # Normalize URL list for batch support
     url_list = args.url if isinstance(args.url, list) else ([args.url] if args.url else [])
 
+    if args.handoff:
+        if args.story_mode:
+            parser.error("--handoff does not support --story-mode.")
+        if args.ratio != "9:16":
+            parser.error("--handoff renders 9:16 clips only (the package targets a 1080x1920 canvas).")
+        if args.voiceover:
+            parser.error("--handoff cannot be combined with --voiceover (it shifts the transcript timing).")
+
     # Validate watermark args
     if args.watermark:
         if not args.text and not args.image:
@@ -897,6 +943,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         hook_v2_style=args.hook_v2_style,
         white_flash_duration=args.white_flash_duration,
         no_segment_trim=args.no_segment_trim,
+        snap_cuts=not args.no_snap_cuts,
         silence_trim=args.silence_trim,
         use_broll=not args.no_broll,
         use_hook_glitch=not args.no_hook,
@@ -946,6 +993,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_model=args.whisper_model,
         whisper_device=args.whisper_device,
         whisper_compute_type=args.whisper_compute_type,
+        transcriber=args.transcriber,
+        transcriber_model=args.transcriber_model,
+        transcriber_language=args.transcriber_language,
+        transcriber_chunk_minutes=args.transcriber_chunk_minutes,
         # AI
         ai_provider=args.ai_provider,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),
@@ -1007,6 +1058,18 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         watermark_padding=args.padding,
         watermark_font_size=args.watermark_font_size,
         watermark_scale=args.watermark_scale,
+        handoff=args.handoff,
     )
+
+    # --handoff renders the clip clean: captions, hook, B-roll and music are designed later in
+    # HyperFrames, and the package transcript must match the clip timeline exactly.
+    if args.handoff:
+        cfg.no_subs = True
+        cfg.use_hook_glitch = False
+        cfg.hook_v2 = False
+        cfg.use_broll = False
+        cfg.use_auto_bgm = False
+        cfg.watermark_enabled = False
+        cfg.edge_glow = False
 
     return cfg

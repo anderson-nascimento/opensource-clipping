@@ -9,7 +9,7 @@ import json
 import os
 
 from . import diarization as diarization_mod
-from . import engine, metadata, studio, hook_manager, voiceover
+from . import engine, metadata, studio, hook_manager, transcribe_api, voiceover
 
 
 def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
@@ -73,13 +73,8 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
                 )
 
     if not full_transcript or not transcript_segments:
-        full_transcript, transcript_segments = engine.transcribe_video(
-            cfg.original_video_file,
-            max_words_per_subtitle=cfg.max_words_per_subtitle,
-            model_size=cfg.whisper_model,
-            device=cfg.whisper_device,
-            compute_type=cfg.whisper_compute_type,
-            whisper_model_instance=whisper_model_instance,
+        full_transcript, transcript_segments = transcribe_api.transcribe_with_fallback(
+            cfg.original_video_file, cfg, whisper_model_instance=whisper_model_instance
         )
 
     # Step 3 — Gemini AI analysis
@@ -99,6 +94,10 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
 
     # Step 4 — Metadata normalisation
     ai_clips = metadata.normalize_and_validate(ai_clips)
+    if getattr(cfg, "snap_cuts", True):
+        from . import clip_bounds
+
+        clip_bounds.snap_clips(ai_clips, transcript_segments)
     metadata.print_preview(ai_clips)
 
     metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
@@ -252,6 +251,12 @@ def run_pipeline(cfg, whisper_model_instance=None) -> list[dict]:
         # Attach source URL so metadata.py can auto-add source credit
         if not row.get("source_url"):
             row["source_url"] = getattr(cfg, "url_youtube", None)
+
+    # Step 7.5 — HyperFrames handoff packages (motion design happens later in Claude Code)
+    if getattr(cfg, "handoff", False):
+        from . import handoff
+
+        handoff.export_all(render_manifest, ai_clips, transcript_segments, cfg)
 
     # Step 8 — Save manifest
     manifest_path = os.path.join(cfg.outputs_dir, "render_manifest.json")

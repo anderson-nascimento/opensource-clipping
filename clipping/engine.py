@@ -7,6 +7,7 @@ Maps to Cell 2 (The Engine) of the notebook.
 import json
 import os
 import re
+import threading
 import time
 
 from yt_dlp import YoutubeDL
@@ -177,6 +178,9 @@ def download_video(
             "quiet": True,
             "merge_output_format": "mp4",
             "remote_components": ["ejs:github"],
+            # YouTube's signature challenges need a JS runtime; yt-dlp only enables deno by
+            # default, so also accept node (already installed locally and on Colab).
+            "js_runtimes": {"deno": {}, "node": {}},
             "progress_hooks": [_ydl_progress_hook],
             "extractor_args": {"youtube": ["player_client=android,web"]},
         }
@@ -191,6 +195,12 @@ def download_video(
             "merge_output_format": "mp4",
             "progress_hooks": [_ydl_progress_hook],
         }
+
+    # On Windows, antivirus real-time scanning (e.g. Defender) briefly locks a freshly written
+    # file, and yt-dlp's default 3 instant retries fail the rename of a finished .part file
+    # (WinError 32). Retry for up to ~1 minute with growing waits instead.
+    ydl_opts["file_access_retries"] = 10
+    ydl_opts["retry_sleep_functions"] = {"file_access": lambda n: min(2 ** n, 10)}
 
     _apply_cookies(ydl_opts, yt_cookies)
 
@@ -524,6 +534,25 @@ def _is_retryable(exc: Exception) -> bool:
     return any(k in msg for k in keywords)
 
 
+HEARTBEAT_SECONDS = 30
+
+
+def _generate_with_heartbeat(client, model, contents, config):
+    """Call generate_content, printing a line every HEARTBEAT_SECONDS so a slow response doesn't look like a hang."""
+    done = threading.Event()
+    t0 = time.time()
+
+    def beat():
+        while not done.wait(HEARTBEAT_SECONDS):
+            print(f"[Gemini] Still waiting for {model}... {time.time() - t0:.0f}s", flush=True)
+
+    threading.Thread(target=beat, daemon=True).start()
+    try:
+        return client.models.generate_content(model=model, contents=contents, config=config)
+    finally:
+        done.set()
+
+
 def _generate_json_with_retry(client, model, fallback_model, contents, config):
     last_exc = None
     status_code = None
@@ -532,11 +561,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
         try:
             print(f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS}...")
 
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            )
+            response = _generate_with_heartbeat(client, model, contents, config)
 
             text = getattr(response, "text", None)
             if not text or not text.strip():
@@ -565,11 +590,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
     if fallback_model:
         print(f"[Gemini] Trying once more with fallback model ({fallback_model})...")
         try:
-            response = client.models.generate_content(
-                model=fallback_model,
-                contents=contents,
-                config=config,
-            )
+            response = _generate_with_heartbeat(client, fallback_model, contents, config)
             text = getattr(response, "text", None)
             if not text or not text.strip():
                 raise ValueError("Gemini fallback returned an empty response.text.")

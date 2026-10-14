@@ -8,6 +8,26 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [v3.2.0] - 2026-10-13
+
+### Added
+- **HyperFrames Handoff (`--handoff`)**: Renders each clip clean (9:16 reframe, no captions, hook, B-roll, music, watermark or glow) and exports a package to `outputs/handoff/rank_<n>/`: `BRIEF.md`, `STYLE.md`, a word-level `transcript.json` on the clip timeline (also correct for multi-segment clips), the AI plan, image ideas, and a `public/` folder with a seekable 30 fps copy of the clip, GSAP, Anton/Inter fonts and 8 SFX (cached in `.cache/handoff/`).
+- **Claude Code skill `/clip-recut`** (`.claude/skills/clip-recut`): Designs the clip's motion graphics with HyperFrames following `assets/handoff/STYLE.md` (composition change every 2.5–3.5s on word starts, 20–30% full-screen takeovers, hook banner, one-word captions in two tiers, SFX), optionally generates images through the `google-flow` MCP, runs `hyperframes lint`/`snapshot` QA and renders `output.mp4`. Includes a reference composition and a captions generator script.
+- **Sentence-aware clip cuts**: The AI's clip start/end (and `keep_segments`) are moved to the nearest sentence boundary using Whisper word timestamps, with a short lead-in and tail, so clips no longer open mid-sentence or end on a dangling word. Starts move back up to 5s to the start of the sentence (or forward up to 3s); ends finish the sentence when it ends within 2.5s, otherwise drop a fragment of up to 3s (or extend up to 6s). A trailing "..." is not used as an ending. Disable with `--no-snap-cuts`. On the benchmark video, all 3 clips had a broken boundary before (e.g. one opened on "...bem prático." instead of "Todo mundo tem um plano").
+- **Transcription via API (`--transcriber groq`)**: Sends only the audio (mono 16 kHz MP3, about 7 MB per 20 minutes) to the Groq Whisper API (`whisper-large-v3` by default, or `--transcriber-model whisper-large-v3-turbo`) and gets word timestamps back, so no GPU or Colab is needed. Audio longer than `--transcriber-chunk-minutes` (20) is split at silences and the timestamps are shifted back. `--transcriber-language pt` skips language detection. Needs `GROQ_API_KEY` in `.env`; if the API fails (no key, network, rate limit), the pipeline falls back to local Whisper. The raw API response is saved to `outputs/transcription_api_raw.json`, and the log shows the estimated cost. `--use-dlp-subs` still takes priority when subtitles are found.
+- **`python -m clipping.handoff collect <outputs_dir>`**: Points `render_manifest.json` at the rendered `output.mp4` files (keeping `clean_video_path`), so the uploaders publish the designed versions.
+
+### Changed
+- **Gemini analysis no longer looks stuck**: While waiting for Gemini (a free-tier response can take several minutes), the console prints `[Gemini] Still waiting for <model>... <n>s` every 30 seconds.
+
+- **`/clip-recut` QA catches dead air**: Besides the hero-time snapshots, the QA step sweeps the whole timeline evenly (24 frames) to find panels that sit empty or frozen before their first element arrives.
+
+### Fixed
+- **`/clip-recut` captions one frame short**: `captions.py` floored durations like 23.133333s to 693 frames (ffprobe prints 6 decimals); a small epsilon now rounds them correctly.
+- **yt-dlp "No supported JavaScript runtime" warning**: YouTube downloads now also accept Node.js as the JS runtime (yt-dlp only enables Deno by default), so the signature challenges are solved and no formats go missing.
+- **Download failing on Windows with WinError 32**: Antivirus real-time scanning (e.g. Defender) briefly locks a freshly downloaded file, and yt-dlp gave up renaming the finished `.part` file after 3 instant retries. It now retries up to 10 times with growing waits (about 1 minute).
+- **Face tracking stuck after a camera cut**: In the default (hybrid) renderer, a cut to a new face that arrived less than `--track-hold` seconds after the previous cut was dropped for good, leaving the crop on an empty part of the frame (e.g. a plant) until the face moved again. Such cuts are now delayed to the end of the hold instead. Camera cuts in the source are detected from frame differences and re-frame immediately, and samples with no face keep the camera still instead of pulling it to the center.
+
 ## [v3.1.0] - 2026-10-12
 
 ### Added

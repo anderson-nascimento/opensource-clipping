@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<!-- Reference composition from the clip-recut proof of concept (rank-1 clip, 26s, grief/resilience story).
+     Shows the full contract: video framing states, panel/takeover/overlay cards, one-word captions,
+     SFX clips and one master GSAP timeline. Copy patterns, not the content: every clip gets its own design. -->
+<style>
+  @font-face { font-family: "Anton"; src: url("fonts/Anton-Regular.ttf") format("truetype"); font-display: block; }
+  @font-face { font-family: "Inter"; src: url("fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: block; }
+  @font-face { font-family: "Inter"; src: url("fonts/Inter-Bold.ttf") format("truetype"); font-weight: 700; font-display: block; }
+  :root {
+    --bg: #0c0c0e; --text: #f4f1ea; --muted: #a9a5a0;
+    --accent-0: #e23a3a; --accent-1: #ffd23f; --accent-2: #36c37a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000;
+    font-family: "Inter", "Anton", sans-serif; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+
+  /* source video: wrapper bounds change per layout; inner shifts the 9:16 frame so the face stays in view */
+  #video-wrap { position: absolute; left: 0; top: 768px; width: 1080px; height: 1152px; overflow: hidden;
+    transform-origin: 50% 32%; }
+  #video-inner { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  #video-inner video { width: 100%; height: 100%; object-fit: cover; }
+
+  .card-host { position: absolute; pointer-events: none; overflow: hidden; }
+  .card-host .card { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  .panel { left: 0; top: 0; width: 1080px; height: 768px; }
+  .full { left: 0; top: 0; width: 1080px; height: 1920px; }
+  .display { font-family: "Anton", sans-serif; text-transform: uppercase; line-height: .98; letter-spacing: 1px; }
+  .kicker { font-family: "Inter", sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 8px; color: var(--muted); }
+  .w { display: inline-block; }
+
+  /* shared top-panel look: near-black with a warm glow and an accent seam */
+  .card[data-card-id] .pbg { position: absolute; inset: 0;
+    background: radial-gradient(120% 90% at 50% 0%, #2a1416 0%, var(--bg) 60%); }
+  .card[data-card-id] .seam { position: absolute; left: 0; bottom: 0; width: 1080px; height: 8px; background: var(--accent-0); }
+
+  /* hook */
+  .card[data-card-id="hook"] .root { position: absolute; inset: 0; padding: 110px 60px 0; text-align: center; }
+  .card[data-card-id="hook"] .kicker { font-size: 38px; }
+  .card[data-card-id="hook"] .l1 { font-size: 150px; color: var(--text); margin-top: 26px; }
+  .card[data-card-id="hook"] .l2 { font-size: 172px; color: var(--accent-0); }
+
+  /* the plan */
+  .card[data-card-id="plan"] .root { position: absolute; inset: 0; padding: 70px 80px 0; }
+  .card[data-card-id="plan"] .kicker { font-size: 34px; }
+  .card[data-card-id="plan"] .title { font-size: 132px; color: var(--text); margin-top: 10px; }
+  .card[data-card-id="plan"] .sub { font: 700 50px/1.2 "Inter", sans-serif; color: var(--text); margin-top: 14px; }
+  .card[data-card-id="plan"] .sub b { color: var(--accent-1); }
+  .card[data-card-id="plan"] .bar { position: relative; margin-top: 36px; width: 920px; height: 40px; border-radius: 20px; background: #26262b; }
+  .card[data-card-id="plan"] .fill { position: absolute; left: 0; top: 0; height: 40px; width: 0; border-radius: 20px; background: var(--accent-2); }
+  .card[data-card-id="plan"] .pct { font: 700 40px "Inter", sans-serif; color: var(--accent-2); margin-top: 14px; letter-spacing: 2px; }
+
+  /* hook banner, torn paper on the seam */
+  .card[data-card-id="banner"] .strip { position: absolute; left: -20px; top: 0; width: 1120px; height: 230px; background: var(--accent-0);
+    clip-path: polygon(0.00% 0px, 2.78% 8px, 5.56% 4px, 8.33% 7px, 11.11% 3px, 13.89% 6px, 16.67% 2px, 19.44% 10px, 22.22% 1px, 25.00% 9px, 27.78% 0px, 30.56% 8px, 33.33% 4px, 36.11% 7px, 38.89% 3px, 41.67% 6px, 44.44% 2px, 47.22% 10px, 50.00% 1px, 52.78% 9px, 55.56% 0px, 58.33% 8px, 61.11% 4px, 63.89% 7px, 66.67% 3px, 69.44% 6px, 72.22% 2px, 75.00% 10px, 77.78% 1px, 80.56% 9px, 83.33% 0px, 86.11% 8px, 88.89% 4px, 91.67% 7px, 94.44% 3px, 97.22% 6px, 100.00% 2px, 100.00% calc(100% - 1px), 97.22% calc(100% - 10px), 94.44% calc(100% - 3px), 91.67% calc(100% - 8px), 88.89% calc(100% - 1px), 86.11% calc(100% - 10px), 83.33% calc(100% - 3px), 80.56% calc(100% - 8px), 77.78% calc(100% - 1px), 75.00% calc(100% - 10px), 72.22% calc(100% - 3px), 69.44% calc(100% - 8px), 66.67% calc(100% - 1px), 63.89% calc(100% - 10px), 61.11% calc(100% - 3px), 58.33% calc(100% - 8px), 55.56% calc(100% - 1px), 52.78% calc(100% - 10px), 50.00% calc(100% - 3px), 47.22% calc(100% - 8px), 44.44% calc(100% - 1px), 41.67% calc(100% - 10px), 38.89% calc(100% - 3px), 36.11% calc(100% - 8px), 33.33% calc(100% - 1px), 30.56% calc(100% - 10px), 27.78% calc(100% - 3px), 25.00% calc(100% - 8px), 22.22% calc(100% - 1px), 19.44% calc(100% - 10px), 16.67% calc(100% - 3px), 13.89% calc(100% - 8px), 11.11% calc(100% - 1px), 8.33% calc(100% - 10px), 5.56% calc(100% - 3px), 2.78% calc(100% - 8px), 0.00% calc(100% - 1px)); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .card[data-card-id="banner"] .t { font-size: 76px; color: #fff; line-height: 1.02; text-align: center; font-style: italic;
+    text-shadow: 3px 3px 0 rgba(0,0,0,.35); }
+  .card[data-card-id="banner"] .t em { color: var(--accent-1); font-style: italic; }
+
+  /* calendar */
+  .card[data-card-id="cal"] .root { position: absolute; inset: 0; padding-top: 34px; text-align: center; }
+  .card[data-card-id="cal"] .month { font-size: 104px; color: var(--text); }
+  .card[data-card-id="cal"] .wd, .card[data-card-id="cal"] .grid { display: grid; grid-template-columns: repeat(7, 132px); gap: 8px; justify-content: center; }
+  .card[data-card-id="cal"] .wd { margin-top: 14px; font: 700 28px "Inter", sans-serif; color: var(--muted); }
+  .card[data-card-id="cal"] .grid { margin-top: 10px; }
+  .card[data-card-id="cal"] .d { height: 84px; border-radius: 14px; background: #1b1b20; color: #d9d6d0; font: 700 38px/84px "Inter", sans-serif; }
+  .card[data-card-id="cal"] .d.e { background: transparent; }
+  .card[data-card-id="cal"] #d19 { background: var(--accent-2); color: #08130c; position: relative; }
+  .card[data-card-id="cal"] .tag { grid-column: span 4; height: 84px; border-radius: 14px; border: 3px solid var(--accent-2);
+    font: 700 32px/78px "Inter", sans-serif; letter-spacing: 3px; color: var(--accent-2); }
+
+  /* day 16 takeover */
+  .card[data-card-id="dia16"] .root { position: absolute; inset: 0; background: radial-gradient(90% 60% at 50% 40%, #1d0d0f 0%, #070708 70%);
+    text-align: center; }
+  .card[data-card-id="dia16"] .kicker { position: absolute; top: 330px; width: 100%; font-size: 44px; }
+  .card[data-card-id="dia16"] .num { position: absolute; top: 390px; width: 100%; font-size: 560px; color: var(--text); line-height: 1; }
+  .card[data-card-id="dia16"] svg { position: absolute; left: 190px; top: 380px; width: 700px; height: 640px; }
+  .card[data-card-id="dia16"] .note { position: absolute; top: 1060px; width: 100%; font: 700 46px "Inter", sans-serif; color: var(--accent-0); letter-spacing: 2px; }
+  .card[data-card-id="dia16"] .q { position: absolute; top: 1260px; width: 100%; font: 700 64px/1.25 "Inter", sans-serif; color: var(--text); }
+  .card[data-card-id="dia16"] .q span { display: block; }
+
+  /* list */
+  .card[data-card-id="list"] .root { position: absolute; inset: 0; padding: 56px 0 0; text-align: center; }
+  .card[data-card-id="list"] .kicker { font-size: 40px; }
+  .card[data-card-id="list"] .it { font-size: 142px; line-height: 1.0; margin-top: 4px; }
+  .card[data-card-id="list"] .a { color: var(--text); }
+  .card[data-card-id="list"] .b { color: var(--accent-0); }
+
+  /* panic */
+  .card[data-card-id="panic"] .img { position: absolute; left: 0; top: -300px; width: 1080px; height: 1360px; object-fit: cover; transform-origin: 50% 45%; }
+  .card[data-card-id="panic"] .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.75) 100%); }
+  .card[data-card-id="panic"] .t { position: absolute; left: 0; bottom: 120px; width: 100%; text-align: center; font-size: 150px; color: var(--text); line-height: 1.25; }
+
+  /* punch takeover */
+  .card[data-card-id="soco"] .img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; transform-origin: 50% 45%; }
+  .card[data-card-id="soco"] .shade { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+  .card[data-card-id="soco"] .k { position: absolute; top: 300px; width: 100%; text-align: center; font: 700 64px "Inter", sans-serif; color: var(--text); letter-spacing: 10px; }
+  .card[data-card-id="soco"] .big { position: absolute; top: 1180px; width: 100%; text-align: center; font-size: 400px; color: var(--text);
+    text-shadow: 0 0 40px rgba(226,58,58,.9), 8px 8px 0 #000; }
+  .card[data-card-id="soco"] .sub { position: absolute; top: 1600px; width: 100%; text-align: center; font-size: 160px; color: var(--accent-0); text-shadow: 6px 6px 0 #000; }
+  .card[data-card-id="soco"] .flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+  /* final question */
+  .card[data-card-id="cade"] .root { position: absolute; inset: 0; text-align: center; }
+  .card[data-card-id="cade"] .a { position: absolute; top: 40px; width: 100%; font-size: 130px; color: var(--text); text-shadow: 6px 6px 0 #000; }
+  .card[data-card-id="cade"] .b { position: absolute; top: 170px; width: 100%; font-size: 250px; color: var(--accent-1);
+    text-shadow: 0 0 34px rgba(255,210,63,.55), 8px 8px 0 #000; }
+  .card[data-card-id="cade"] .strike { position: absolute; left: 150px; top: 300px; width: 0; height: 26px; background: var(--accent-0);
+    transform: rotate(-6deg); box-shadow: 0 4px 0 #000; }
+
+  /* captions: one word at a time, two tiers */
+  .cap { position: absolute; left: 0; width: 1080px; height: 150px; line-height: 150px; text-align: center; pointer-events: none;
+    font-family: "Anton", sans-serif; text-transform: uppercase; font-size: 100px; color: #fff; letter-spacing: 1px;
+    text-shadow: 0 0 14px rgba(0,0,0,.85), 5px 5px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
+  .cap.key { font-size: 136px; color: var(--accent-1);
+    text-shadow: 0 0 28px rgba(255,210,63,.6), 6px 6px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; }
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="talking-head-recut" data-start="0" data-duration="26.0333" data-fps="30" data-width="1080" data-height="1920">
+
+  <div id="video-wrap">
+    <div id="video-inner">
+      <video id="bg-video" class="clip" src="input-video.mp4" playsinline data-has-audio="true"
+             data-start="0" data-duration="26.0333" data-track-index="1"></video>
+    </div>
+  </div>
+
+  <!-- hook headline (top panel) -->
+  <div id="host-hook" class="card-host clip panel" data-card-id="hook" data-start="0" data-duration="2.1" data-track-index="2">
+    <div class="card" data-card-id="hook"><div class="pbg"></div>
+      <div class="root">
+        <div class="kicker" id="hook-k">Todo mundo tem um plano…</div>
+        <div class="display l1" id="hook-l1"><span class="w">até</span> <span class="w">levar</span> <span class="w">um</span></div>
+        <div class="display l2" id="hook-l2">soco.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- the plan (top panel) -->
+  <div id="host-plan" class="card-host clip panel" data-card-id="plan" data-start="2.1" data-duration="3.78" data-track-index="2">
+    <div class="card" data-card-id="plan"><div class="pbg"></div>
+      <div class="root">
+        <div class="kicker">O plano</div>
+        <div class="display title" id="plan-t">Lançamento #1</div>
+        <div class="sub" id="plan-s">Primeiro <b>produto digital</b></div>
+        <div class="bar"><div class="fill" id="plan-fill"></div></div>
+        <div class="pct" id="plan-pct">PRONTO PRA LANÇAR · <span id="plan-n">0</span>%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- hook banner on the seam -->
+  <div id="host-banner" class="card-host clip" data-card-id="banner" data-start="0" data-duration="5.88" data-track-index="3"
+       style="left:0;top:655px;width:1080px;height:230px;z-index:5;">
+    <div class="card" data-card-id="banner">
+      <div class="strip" id="banner-strip">
+        <div class="display t">O que fazer quando a vida</div>
+        <div class="display t">te dá um <em>soco?</em></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- calendar (top panel) -->
+  <div id="host-cal" class="card-host clip panel" data-card-id="cal" data-start="5.88" data-duration="4.07" data-track-index="2">
+    <div class="card" data-card-id="cal"><div class="pbg"></div><div class="seam"></div>
+      <div class="root">
+        <div class="display month" id="cal-m">Junho</div>
+        <div class="wd"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
+        <div class="grid" id="cal-g"><div class="d e"></div><div class="d">1</div><div class="d">2</div><div class="d">3</div><div class="d">4</div><div class="d">5</div><div class="d">6</div><div class="d">7</div><div class="d">8</div><div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d">12</div><div class="d">13</div><div class="d">14</div><div class="d">15</div><div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d" id="d19">19</div><div class="d">20</div><div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d">26</div><div class="d">27</div><div class="d">28</div><div class="d">29</div><div class="d">30</div><div class="tag">← LANÇAMENTO</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- day 16 (full-screen takeover) -->
+  <div id="host-dia16" class="card-host clip full" data-card-id="dia16" data-start="9.95" data-duration="3.6" data-track-index="2">
+    <div class="card" data-card-id="dia16">
+      <div class="root">
+        <div class="kicker" id="d16-k">Dia</div>
+        <div class="display num" id="d16-n">16</div>
+        <svg viewBox="0 0 700 640"><path id="d16-c" d="M 360 40 C 560 30 680 170 670 330 C 660 500 520 610 340 600 C 160 590 30 470 40 310 C 50 150 190 50 380 60"
+          fill="none" stroke="#e23a3a" stroke-width="16" stroke-linecap="round"/></svg>
+        <div class="note" id="d16-note">3 DIAS ANTES DO LANÇAMENTO</div>
+        <div class="q"><span id="d16-q1">a minha irmã falece,</span><span id="d16-q2">na minha frente.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- list (top panel) -->
+  <div id="host-list" class="card-host clip panel" data-card-id="list" data-start="15.95" data-duration="3.0" data-track-index="2">
+    <div class="card" data-card-id="list"><div class="pbg"></div><div class="seam"></div>
+      <div class="root">
+        <div class="kicker" id="list-k">Mulher</div>
+        <div class="display it a" id="li-1">Gigante</div>
+        <div class="display it b" id="li-2">Forte</div>
+        <div class="display it a" id="li-3">Bonita</div>
+        <div class="display it b" id="li-4">Malhada</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- panic (top panel, AI image) -->
+  <div id="host-panic" class="card-host clip panel" data-card-id="panic" data-start="18.95" data-duration="3.0" data-track-index="2">
+    <div class="card" data-card-id="panic">
+      <img class="img" id="panic-img" src="assets/img_panic.jpg" alt="" />
+      <div class="shade"></div><div class="seam"></div>
+      <div class="display t" id="panic-t">Crise de pânico</div>
+    </div>
+  </div>
+
+  <!-- punch (full-screen takeover, AI image) -->
+  <div id="host-soco" class="card-host clip full" data-card-id="soco" data-start="21.95" data-duration="2.4" data-track-index="2">
+    <div class="card" data-card-id="soco">
+      <img class="img" id="soco-img" src="assets/img_punch.jpg" alt="" />
+      <div class="shade"></div>
+      <div class="k" id="soco-k">ESSE É O</div>
+      <div class="display big" id="soco-big">Soco</div>
+      <div class="display sub" id="soco-sub">na cara</div>
+      <div class="flash" id="soco-flash"></div>
+    </div>
+  </div>
+
+  <!-- final question over the punched-in video -->
+  <div id="host-cade" class="card-host clip" data-card-id="cade" data-start="24.42" data-duration="1.6133" data-track-index="2"
+       style="left:0;top:1180px;width:1080px;height:560px;">
+    <div class="card" data-card-id="cade">
+      <div class="root">
+        <div class="display a" id="cade-a">Cadê o</div>
+        <div class="display b" id="cade-b">plano?</div>
+        <div class="strike" id="cade-s"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- captions -->
+  <div id="cap-11" class="cap clip" data-start="5.880" data-duration="0.480" data-track-index="5" style="top:693px;">Nós</div>
+  <div id="cap-12" class="cap clip" data-start="6.360" data-duration="0.180" data-track-index="5" style="top:693px;">íamos</div>
+  <div id="cap-13" class="cap clip key" data-start="6.540" data-duration="0.280" data-track-index="5" style="top:693px;">lançar</div>
+  <div id="cap-14" class="cap clip" data-start="6.820" data-duration="0.100" data-track-index="5" style="top:693px;">o</div>
+  <div id="cap-15" class="cap clip" data-start="6.920" data-duration="0.340" data-track-index="5" style="top:693px;">produto</div>
+  <div id="cap-16" class="cap clip" data-start="7.260" data-duration="0.520" data-track-index="5" style="top:693px;">dia</div>
+  <div id="cap-17" class="cap clip key" data-start="7.780" data-duration="1.040" data-track-index="5" style="top:693px;">19</div>
+  <div id="cap-18" class="cap clip" data-start="8.820" data-duration="0.360" data-track-index="5" style="top:693px;">de</div>
+  <div id="cap-19" class="cap clip key" data-start="9.180" data-duration="0.770" data-track-index="5" style="top:693px;">junho</div>
+  <div id="cap-29" class="cap clip" data-start="13.600" data-duration="0.600" data-track-index="5" style="top:1230px;">Nossa</div>
+  <div id="cap-30" class="cap clip" data-start="14.200" data-duration="0.020" data-track-index="5" style="top:1230px;">que</div>
+  <div id="cap-31" class="cap clip key" data-start="14.220" data-duration="0.240" data-track-index="5" style="top:1230px;">dor</div>
+  <div id="cap-32" class="cap clip" data-start="14.460" data-duration="1.200" data-track-index="5" style="top:1230px;">hein</div>
+  <div id="cap-38" class="cap clip" data-start="19.000" data-duration="0.340" data-track-index="5" style="top:693px;">Tem</div>
+  <div id="cap-39" class="cap clip" data-start="19.340" data-duration="0.140" data-track-index="5" style="top:693px;">uma</div>
+  <div id="cap-40" class="cap clip key" data-start="19.480" data-duration="0.160" data-track-index="5" style="top:693px;">crise</div>
+  <div id="cap-41" class="cap clip" data-start="19.640" data-duration="0.180" data-track-index="5" style="top:693px;">de</div>
+  <div id="cap-42" class="cap clip key" data-start="19.820" data-duration="0.320" data-track-index="5" style="top:693px;">pânico</div>
+  <div id="cap-43" class="cap clip" data-start="20.140" data-duration="0.080" data-track-index="5" style="top:693px;">e</div>
+  <div id="cap-44" class="cap clip" data-start="20.220" data-duration="0.100" data-track-index="5" style="top:693px;">não</div>
+  <div id="cap-45" class="cap clip" data-start="20.320" data-duration="0.200" data-track-index="5" style="top:693px;">sai</div>
+  <div id="cap-46" class="cap clip" data-start="20.520" data-duration="0.160" data-track-index="5" style="top:693px;">dessa</div>
+  <div id="cap-47" class="cap clip key" data-start="20.680" data-duration="0.260" data-track-index="5" style="top:693px;">crise</div>
+  <div id="cap-48" class="cap clip" data-start="20.940" data-duration="0.120" data-track-index="5" style="top:693px;">de</div>
+  <div id="cap-49" class="cap clip key" data-start="21.060" data-duration="0.890" data-track-index="5" style="top:693px;">pânico</div>
+
+  <!-- sfx -->
+  <audio id="sfx-whoosh-1" class="clip" src="assets/sfx_whoosh-short.mp3" data-start="9.9" data-duration="0.57" data-track-index="10" data-volume="0.3"></audio>
+  <audio id="sfx-pop-19" class="clip" src="assets/sfx_pop.mp3" data-start="7.78" data-duration="0.72" data-track-index="11" data-volume="0.35"></audio>
+  <audio id="sfx-pop-l1" class="clip" src="assets/sfx_pop.mp3" data-start="16.46" data-duration="0.45" data-track-index="12" data-volume="0.22"></audio>
+  <audio id="sfx-pop-l2" class="clip" src="assets/sfx_pop.mp3" data-start="16.96" data-duration="0.45" data-track-index="13" data-volume="0.22"></audio>
+  <audio id="sfx-pop-l3" class="clip" src="assets/sfx_pop.mp3" data-start="17.48" data-duration="0.42" data-track-index="14" data-volume="0.22"></audio>
+  <audio id="sfx-pop-l4" class="clip" src="assets/sfx_pop.mp3" data-start="17.92" data-duration="0.72" data-track-index="15" data-volume="0.22"></audio>
+  <audio id="sfx-riser" class="clip" src="assets/sfx_riser.mp3" data-start="19.9" data-duration="2.0" data-media-start="8.0" data-track-index="16" data-volume="0.3"></audio>
+  <audio id="sfx-whoosh-2" class="clip" src="assets/sfx_whoosh-short.mp3" data-start="21.9" data-duration="0.57" data-track-index="17" data-volume="0.35"></audio>
+  <audio id="sfx-impact" class="clip" src="assets/sfx_impact-bass-1.mp3" data-start="22.7" data-duration="2.1" data-track-index="18" data-volume="0.5"></audio>
+  <audio id="sfx-click" class="clip" src="assets/sfx_click-soft.mp3" data-start="25.68" data-duration="0.35" data-track-index="19" data-volume="0.4"></audio>
+
+  <script src="vendor/gsap.min.js"></script>
+  <script>
+  (function () {
+    const tl = window.gsap.timeline({ paused: true });
+    const C = (id) => '.card[data-card-id="' + id + '"] ';
+
+    // ── video framing (hard cuts, like the reference) ──
+    const SPLIT = { top: 768, height: 1152 }, FULL = { top: 0, height: 1920 };
+    tl.set("#video-wrap", Object.assign({ scale: 1 }, SPLIT), 0);
+    tl.set("#video-inner", { y: -110 }, 0);
+    tl.set("#video-wrap", FULL, 13.55); tl.set("#video-inner", { y: 0 }, 13.55);
+    tl.set("#video-wrap", SPLIT, 15.95); tl.set("#video-inner", { y: -110 }, 15.95);
+    tl.set("#video-wrap", Object.assign({ scale: 1.15 }, FULL), 24.35); tl.set("#video-inner", { y: 0 }, 24.35);
+    // slow creep inside the punch-in keeps the last beat alive
+    tl.fromTo("#video-wrap", { scale: 1.15 }, { scale: 1.2, duration: 1.65, ease: "none", immediateRender: false }, 24.38);
+
+    // ── hook ──
+    tl.from(C("hook") + "#hook-k", { opacity: 0, y: 20, duration: 0.3, ease: "power2.out" }, 0.05);
+    tl.from(C("hook") + "#hook-l1 .w", { opacity: 0, y: 40, scale: 0.85, duration: 0.25, ease: "back.out(2)", stagger: 0.12 }, 0.35);
+    tl.fromTo(C("hook") + "#hook-l2", { opacity: 0, scale: 1.8 }, { opacity: 1, scale: 1, duration: 0.2, ease: "power3.out" }, 0.95);
+    tl.fromTo("#banner-strip", { x: -1120 }, { x: 0, duration: 0.3, ease: "power3.out" }, 0.0);
+
+    // ── plan ──
+    tl.from(C("plan") + "#plan-t", { opacity: 0, x: -60, duration: 0.3, ease: "power2.out" }, 2.1);
+    tl.from(C("plan") + "#plan-s", { opacity: 0, y: 20, duration: 0.3, ease: "power2.out" }, 3.68);
+    tl.fromTo(C("plan") + "#plan-fill", { width: 0 }, { width: 860, duration: 3.2, ease: "power1.inOut" }, 2.4);
+    (function () { const o = { v: 0 }; tl.to(o, { v: 93, duration: 3.2, ease: "power1.inOut",
+      onUpdate: function () { const el = document.getElementById("plan-n"); if (el) el.textContent = Math.round(o.v); } }, 2.4); })();
+
+    // ── calendar ──
+    tl.from(C("cal") + "#cal-m", { opacity: 0, y: -30, duration: 0.25, ease: "power2.out" }, 5.88);
+    tl.from(C("cal") + ".d", { opacity: 0, scale: 0.6, duration: 0.18, ease: "power2.out", stagger: 0.012 }, 5.95);
+    tl.set(C("cal") + "#d19", { backgroundColor: "#1b1b20", color: "#d9d6d0" }, 5.88);
+    tl.set(C("cal") + ".tag", { opacity: 0 }, 5.88);
+    tl.to(C("cal") + "#d19", { backgroundColor: "#36c37a", color: "#08130c", duration: 0.01 }, 7.78);
+    tl.fromTo(C("cal") + "#d19", { scale: 1.6 }, { scale: 1, duration: 0.3, ease: "back.out(2.2)", immediateRender: false }, 7.78);
+    tl.fromTo(C("cal") + ".tag", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, 7.95);
+
+    // ── day 16 ──
+    tl.from(C("dia16") + "#d16-k", { opacity: 0, duration: 0.2 }, 9.98);
+    tl.fromTo(C("dia16") + "#d16-n", { opacity: 0, scale: 1.25 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power3.out" }, 10.28);
+    (function () { const el = document.querySelector(C("dia16") + "#d16-c"); if (el) { const L = el.getTotalLength();
+      tl.set(el, { strokeDasharray: L, strokeDashoffset: L, opacity: 0 }, 9.95); tl.set(el, { opacity: 1 }, 10.5);
+      tl.to(el, { strokeDashoffset: 0, duration: 0.55, ease: "power2.inOut" }, 10.5); } })();
+    tl.from(C("dia16") + "#d16-note", { opacity: 0, y: 16, duration: 0.3 }, 10.9);
+    tl.from(C("dia16") + "#d16-q1", { opacity: 0, y: 24, duration: 0.35, ease: "power2.out" }, 11.1);
+    tl.from(C("dia16") + "#d16-q2", { opacity: 0, y: 24, duration: 0.35, ease: "power2.out" }, 11.94);
+    tl.to(C("dia16") + "#d16-n", { scale: 1.06, duration: 3.0, ease: "none" }, 10.55);
+
+    // ── list: each word lands on its spoken word ──
+    tl.from(C("list") + "#list-k", { opacity: 0, duration: 0.2 }, 16.0);
+    [["#li-1", 16.46], ["#li-2", 16.96], ["#li-3", 17.48], ["#li-4", 17.92]].forEach(function (p) {
+      tl.fromTo(C("list") + p[0], { opacity: 0, scale: 1.7 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power3.out" }, p[1]);
+    });
+
+    // ── panic ──
+    tl.fromTo(C("panic") + "#panic-img", { scale: 1.0 }, { scale: 1.1, duration: 3.0, ease: "none" }, 18.95);
+    tl.fromTo(C("panic") + "#panic-t", { opacity: 0, clipPath: "inset(0 100% 0 0)" },
+      { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: 0.4, ease: "power2.inOut" }, 19.6);
+
+    // ── punch ──
+    tl.fromTo(C("soco") + "#soco-img", { scale: 1.0 }, { scale: 1.14, duration: 2.4, ease: "none" }, 21.95);
+    tl.from(C("soco") + "#soco-k", { opacity: 0, y: 20, duration: 0.2 }, 22.06);
+    tl.set(C("soco") + "#soco-big", { opacity: 0 }, 21.95);
+    tl.fromTo(C("soco") + "#soco-big", { opacity: 1, scale: 2.2 }, { opacity: 1, scale: 1, duration: 0.14, ease: "power4.in", immediateRender: false }, 22.7);
+    tl.fromTo(C("soco") + "#soco-flash", { opacity: 0.85 }, { opacity: 0, duration: 0.22, ease: "power2.out", immediateRender: false }, 22.84);
+    [[-26, 22.84], [22, 22.88], [-16, 22.92], [10, 22.96], [-5, 23.0], [0, 23.04]].forEach(function (p) {
+      tl.to(C("soco") + ".card", { x: p[0], y: -p[0] / 2, duration: 0.04, ease: "none" }, p[1]);
+    });
+    tl.fromTo(C("soco") + "#soco-sub", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.18, ease: "back.out(2)" }, 23.16);
+
+    // ── final question ──
+    tl.from(C("cade") + "#cade-a", { opacity: 0, y: 30, duration: 0.2, ease: "power2.out" }, 24.42);
+    tl.fromTo(C("cade") + "#cade-b", { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: 0.18, ease: "power3.out" }, 25.26);
+    tl.fromTo(C("cade") + "#cade-s", { width: 0 }, { width: 780, duration: 0.22, ease: "power2.out" }, 25.68);
+
+    // ── captions pop ──
+    tl.fromTo("#cap-11", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 5.880);
+    tl.fromTo("#cap-12", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 6.360);
+    tl.fromTo("#cap-13", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 6.540);
+    tl.fromTo("#cap-14", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 6.820);
+    tl.fromTo("#cap-15", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 6.920);
+    tl.fromTo("#cap-16", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 7.260);
+    tl.fromTo("#cap-17", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 7.780);
+    tl.fromTo("#cap-18", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 8.820);
+    tl.fromTo("#cap-19", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 9.180);
+    tl.fromTo("#cap-29", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 13.600);
+    tl.fromTo("#cap-30", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 14.200);
+    tl.fromTo("#cap-31", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 14.220);
+    tl.fromTo("#cap-32", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 14.460);
+    tl.fromTo("#cap-38", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 19.000);
+    tl.fromTo("#cap-39", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 19.340);
+    tl.fromTo("#cap-40", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 19.480);
+    tl.fromTo("#cap-41", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 19.640);
+    tl.fromTo("#cap-42", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 19.820);
+    tl.fromTo("#cap-43", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.140);
+    tl.fromTo("#cap-44", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.220);
+    tl.fromTo("#cap-45", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.320);
+    tl.fromTo("#cap-46", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.520);
+    tl.fromTo("#cap-47", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.680);
+    tl.fromTo("#cap-48", { scale: 0.85 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 20.940);
+    tl.fromTo("#cap-49", { scale: 0.7 }, { scale: 1, duration: 0.12, ease: "back.out(2.5)" }, 21.060);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines["talking-head-recut"] = tl;
+  })();
+  </script>
+</div>
+</body>
+</html>

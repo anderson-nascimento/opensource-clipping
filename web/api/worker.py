@@ -200,6 +200,10 @@ def _run_pipeline_sync(job_id: str, payload: dict) -> None:
         from clipping import metadata
 
         ai_clips = metadata.normalize_and_validate(ai_clips)
+        if getattr(cfg, "snap_cuts", True):
+            from clipping import clip_bounds
+
+            clip_bounds.snap_clips(ai_clips, transcript_segments)
         metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
         metadata.save_metadata_preview(ai_clips, path=metadata_path)
 

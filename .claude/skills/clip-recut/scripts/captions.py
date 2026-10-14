@@ -35,7 +35,7 @@ def main():
 
     words = json.load(open(os.path.join(args.pkg, "transcript.json"), encoding="utf-8"))
     meta = json.load(open(os.path.join(args.pkg, "metadata.json"), encoding="utf-8"))
-    duration = int(float(meta["format"]["duration"]) * 30) / 30
+    duration = int(float(meta["format"]["duration"]) * 30 + 0.01) / 30  # +eps: ffprobe prints 6 decimals, 23.133333*30 = 693.99999
     windows = []
     for part in args.windows.split(","):
         span, top = part.strip().split("@")

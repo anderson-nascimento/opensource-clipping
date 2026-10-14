@@ -124,6 +124,12 @@ Open `qa/contact-sheet*.jpg` and check every frame: overlaps, clipped letters, t
 face, captions duplicating card text, elements visible too early, wrong framing. Fix and
 snapshot again until clean.
 
+Hero-time snapshots miss **dead air**. Also sweep the whole timeline evenly
+(`npx hyperframes snapshot public -o qa/sweep --frames 24`) and look for panels that sit
+empty or static before their first element arrives (an empty box or a counter frozen at "0"
+for over ~0.4s). Make each beat's first element enter on the beat's first spoken word, and
+keep counters hidden until they start counting.
+
 ### 7. Render
 ```bash
 cd PKG

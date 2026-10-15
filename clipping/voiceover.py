@@ -223,8 +223,8 @@ def generate_commentary_script(transcript_snippet: str, cfg, style="analysis", l
         top_p=0.9,
     )
     
-    model = getattr(cfg, "gemini_model", "gemini-3.1-flash-lite")
-    fallback = getattr(cfg, "gemini_fallback_model", "gemini-3.8-flash")
+    model = getattr(cfg, "gemini_model", "gemini-3.8-flash")
+    fallback = getattr(cfg, "gemini_fallback_model", "gemini-3.1-flash-lite")
     
     try:
         response = client.models.generate_content(

@@ -164,9 +164,9 @@ RENDER_OUTPUT_HEIGHT = 1080
 # AI Provider
 AI_PROVIDER = "gemini"
 NVIDIA_MODEL = "deepseek-ai/deepseek-v4-pro"
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-3.8-flash"
 CONTENT_LANG = "en"  # language of titles, captions, hashtags and thumbnail text
-GEMINI_FALLBACK_MODEL = "gemini-3.8-flash"
+GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 
 # ==============================================================================

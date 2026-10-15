@@ -22,8 +22,8 @@ Complete reference for all command-line arguments. Run `python main.py --help` f
 | Argument | Default | Description |
 |---|---|---|
 | `--ai-provider` | `gemini` | AI provider for analysis: `gemini` or `nvidia` |
-| `--gemini-model` | `gemini-3.1-flash-lite` | Gemini model name |
-| `--gemini-fallback-model` | `gemini-3.8-flash` | Fallback model if main model fails |
+| `--gemini-model` | `gemini-3.8-flash` | Gemini model name |
+| `--gemini-fallback-model` | `gemini-3.1-flash-lite` | Fallback model if main model fails |
 | `--lang` | `en` | Language for all generated metadata: titles, captions, hashtags and thumbnail (e.g. `en`, `pt-BR`, `es`) |
 | `--nvidia-model` | `deepseek-ai/deepseek-v4-pro` | Model name for NVIDIA NIM API |
 | `--load-gemini-json` | `False` | Load saved `gemini_response.json` to bypass AI call |

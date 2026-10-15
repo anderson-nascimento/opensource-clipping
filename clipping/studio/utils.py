@@ -1,3 +1,4 @@
+import bisect
 import html
 import importlib.util
 import json
@@ -90,6 +91,40 @@ class SequentialFrameSampler:
                 return False, None
             self.pos_s = self.cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
         return self.cap.retrieve()
+
+
+def interpolate_track(samples, times, t, keys, jump, max_gap=None):
+    """
+    Values of *keys* at time *t* from time-sorted camera samples [{"time", key, ...}].
+    *times* is ``[s["time"] for s in samples]``, built once by the caller.
+
+    Interpolates linearly between the two samples around *t*, except:
+      - when "cx" changes by more than *jump* pixels (a cut to another face or camera
+        angle), the value steps at the midpoint instead of panning across the frame;
+      - when the samples are more than *max_gap* seconds apart (the face was not seen in
+        between), the earlier value is held until the next sample, so a crop never slides
+        slowly over the background while its face is missing.
+
+    Returns a tuple with one value per key, or None when there are no samples.
+    """
+    if not samples:
+        return None
+    if t <= samples[0]["time"]:
+        return tuple(samples[0][k] for k in keys)
+    if t >= samples[-1]["time"]:
+        return tuple(samples[-1][k] for k in keys)
+
+    i = bisect.bisect_right(times, t) - 1
+    a, b = samples[i], samples[i + 1]
+    t1, t2 = a["time"], b["time"]
+    if t2 <= t1:
+        return tuple(a[k] for k in keys)
+    if max_gap is not None and t2 - t1 > max_gap:
+        return tuple(a[k] for k in keys)
+    if abs(b["cx"] - a["cx"]) > jump:
+        return tuple((a if t < (t1 + t2) / 2 else b)[k] for k in keys)
+    frac = (t - t1) / (t2 - t1)
+    return tuple(a[k] + (b[k] - a[k]) * frac for k in keys)
 
 
 def _get_cv2_interpolation(cfg=None):

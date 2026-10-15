@@ -35,7 +35,7 @@ def _ffmpeg_has_encoder(name: str) -> bool:
         ["ffmpeg", "-hide_banner", "-encoders"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
     )
     return name in result.stdout
 
@@ -66,7 +66,7 @@ def _test_encoder_runtime(encoder_args):
         + ["-pix_fmt", "yuv420p", "-an", "-f", "null", "-"]
     )
     result = subprocess.run(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace"
     )
     return result.returncode == 0, result.stderr[-1000:]
 
@@ -329,43 +329,50 @@ def run_ffmpeg_with_progress(ffmpeg_cmd, total_duration, label="Render"):
         ffmpeg_cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         bufsize=1,
     )
 
     last_percent = -1
     error_lines = []
 
-    for raw_line in process.stderr:
-        line = raw_line.strip()
+    try:
+        for raw_line in process.stderr:
+            line = raw_line.strip()
 
-        if "fontselect" in line.lower() or "using font provider" in line.lower():
-            print("🔎", line, flush=True)
+            if "fontselect" in line.lower() or "using font provider" in line.lower():
+                print("🔎", line, flush=True)
 
-        if line and "=" not in line:
-            error_lines.append(line)
-            if len(error_lines) > 50:
-                error_lines = error_lines[-50:]
+            if line and "=" not in line:
+                error_lines.append(line)
+                if len(error_lines) > 50:
+                    error_lines = error_lines[-50:]
 
-        if line.startswith("out_time_ms="):
-            try:
-                out_time_ms = int(line.split("=", 1)[1])
-                current_time = out_time_ms / 1_000_000
-                percent = (
-                    min(100, int((current_time / total_duration) * 100))
-                    if total_duration > 0
-                    else 0
-                )
-
-                if percent != last_percent:
-                    print(
-                        f"⏳ {label}: {percent:3d}% | "
-                        f"{format_seconds(current_time)} / {format_seconds(total_duration)}",
-                        flush=True,
+            if line.startswith("out_time_ms="):
+                try:
+                    out_time_ms = int(line.split("=", 1)[1])
+                    current_time = out_time_ms / 1_000_000
+                    percent = (
+                        min(100, int((current_time / total_duration) * 100))
+                        if total_duration > 0
+                        else 0
                     )
-                    last_percent = percent
-            except Exception:
-                pass
+
+                    if percent != last_percent:
+                        print(
+                            f"⏳ {label}: {percent:3d}% | "
+                            f"{format_seconds(current_time)} / {format_seconds(total_duration)}",
+                            flush=True,
+                        )
+                        last_percent = percent
+                except Exception:
+                    pass
+    except BaseException:
+        # Do not leave FFmpeg running (and holding its input/output files open) when
+        # reading its log fails or the run is interrupted.
+        process.kill()
+        process.wait()
+        raise
 
     return_code = process.wait()
     return return_code, error_lines[-20:]

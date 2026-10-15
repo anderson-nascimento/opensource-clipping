@@ -37,6 +37,12 @@ USE_SPLIT_SCREEN = False
 USE_CAMERA_SWITCH = False
 DIARIZATION_NUM_SPEAKERS = "auto"
 SWITCH_HOLD_DURATION = 2.0
+AVATAR_RATIO = 0.45  # share of the 9:16 frame height taken by the avatar (--avatar-split)
+# Caption defaults with --avatar-split (the caption band above the seam is short, so
+# condensed text and fewer words per group fit on one line). Explicit flags win.
+AVATAR_CAPTION_STYLE = "box"
+AVATAR_FONT_STYLE = "CINEMATIC"
+AVATAR_WORDS_PER_SUB = 3
 SWITCH_BLEND_DURATION = 0.0  # 0 = instant snap, >0 = smooth blend in seconds
 
 # Source Platform
@@ -158,9 +164,9 @@ RENDER_OUTPUT_HEIGHT = 1080
 # AI Provider
 AI_PROVIDER = "gemini"
 NVIDIA_MODEL = "deepseek-ai/deepseek-v4-pro"
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-3.8-flash"
 CONTENT_LANG = "en"  # language of titles, captions, hashtags and thumbnail text
-GEMINI_FALLBACK_MODEL = "gemini-3.8-flash"
+GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 
 # ==============================================================================
@@ -282,8 +288,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--words-per-sub",
         type=int,
-        default=MAX_WORDS_PER_SUBTITLE,
-        help="Max words per karaoke subtitle group",
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
+        help=f"Max words per karaoke subtitle group (default: {MAX_WORDS_PER_SUBTITLE}; "
+        f"{AVATAR_WORDS_PER_SUB} with --avatar-split)",
     )
     p.add_argument(
         "--hook-duration",
@@ -366,6 +373,30 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Blend duration when switching speakers (0 = instant snap, 0.2 = smooth 200ms transition). Default is 0 (instant snap).",
     )
     p.add_argument(
+        "--avatar-split",
+        metavar="FILE",
+        default=None,
+        help="Split the 9:16 frame between the face-tracked clip and your channel avatar: a video "
+        "(looped for the whole clip) or an image. Not combinable with --split-screen or --camera-switch.",
+    )
+    p.add_argument(
+        "--avatar-position",
+        choices=["bottom", "top"],
+        default="bottom",
+        help="Where the avatar goes with --avatar-split",
+    )
+    p.add_argument(
+        "--avatar-ratio",
+        type=float,
+        default=AVATAR_RATIO,
+        help="Share of the frame height taken by the avatar with --avatar-split (0.2-0.6)",
+    )
+    p.add_argument(
+        "--avatar-label",
+        default="",
+        help='Channel label drawn on the seam with --avatar-split, e.g. "@mychannel" (default: none)',
+    )
+    p.add_argument(
         "--no-subs",
         action="store_true",
         help="Disable all subtitle rendering (useful if you only want the video without text)",
@@ -413,9 +444,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--caption-style",
         choices=["classic", "box", "yellow_pop", "one_word"],
-        default=CAPTION_STYLE,
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
         help="Caption look: classic (original), box (word in a colored box), "
-             "yellow_pop (word turns yellow and pops), one_word (one big word at a time)",
+             "yellow_pop (word turns yellow and pops), one_word (one big word at a time) "
+             f"(default: {CAPTION_STYLE}; {AVATAR_CAPTION_STYLE} with --avatar-split)",
     )
     p.add_argument(
         "--caption-color",
@@ -424,9 +456,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--font-style",
-        default=ACTIVE_FONT_STYLE,
+        default=argparse.SUPPRESS,  # resolved in build_config; keeps help free of "(default: None)"
         choices=["DEFAULT", "STORYTELLER", "HORMOZI", "CINEMATIC"],
-        help="Font style preset",
+        help=f"Font style preset (default: {ACTIVE_FONT_STYLE}; {AVATAR_FONT_STYLE} with --avatar-split)",
     )
     p.add_argument(
         "--advanced-text",
@@ -477,6 +509,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--transcriber-language",
         default=None,
         help="ISO-639-1 code of the spoken language for the API (e.g. pt); default: auto-detect",
+    )
+    p.add_argument(
+        "--no-transcript-cache",
+        action="store_true",
+        help="Transcribe again even when a saved transcript of the same video and settings exists",
     )
     p.add_argument(
         "--transcriber-chunk-minutes",
@@ -863,6 +900,27 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
     # Normalize URL list for batch support
     url_list = args.url if isinstance(args.url, list) else ([args.url] if args.url else [])
 
+    if args.avatar_split:
+        if not os.path.isfile(args.avatar_split):
+            parser.error(f"--avatar-split file not found: {args.avatar_split}")
+        if args.ratio != "9:16":
+            parser.error("--avatar-split needs --ratio 9:16.")
+        if args.split_screen or args.camera_switch:
+            parser.error("--avatar-split cannot be combined with --split-screen or --camera-switch.")
+        if args.handoff:
+            parser.error("--avatar-split cannot be combined with --handoff (the handoff renders the clip clean).")
+        if not 0.2 <= args.avatar_ratio <= 0.6:
+            parser.error(f"--avatar-ratio must be between 0.2 and 0.6, got: {args.avatar_ratio}")
+
+    # Caption defaults depend on the layout; flags given explicitly are kept.
+    avatar = bool(args.avatar_split)
+    if not hasattr(args, "caption_style"):
+        args.caption_style = AVATAR_CAPTION_STYLE if avatar else CAPTION_STYLE
+    if not hasattr(args, "font_style"):
+        args.font_style = AVATAR_FONT_STYLE if avatar else ACTIVE_FONT_STYLE
+    if not hasattr(args, "words_per_sub"):
+        args.words_per_sub = AVATAR_WORDS_PER_SUB if avatar else MAX_WORDS_PER_SUBTITLE
+
     if args.handoff:
         if args.story_mode:
             parser.error("--handoff does not support --story-mode.")
@@ -906,7 +964,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         font_dir=font_dir,
         original_video_file=os.path.abspath(os.path.join(base_dir, "original_video.mp4")),
         file_font_thumbnail=os.path.abspath(
-            os.path.join(base_dir, THUMBNAIL_FONT_NAME)
+            os.path.join(font_dir, THUMBNAIL_FONT_NAME)
         ),
         file_mediapipe_model=os.path.abspath(
             os.path.join(base_dir, "blaze_face_full_range.tflite")
@@ -954,6 +1012,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         use_dynamic_split=args.dynamic_split,
         split_trigger=args.split_trigger,
         use_camera_switch=args.camera_switch,
+        avatar_split=os.path.abspath(args.avatar_split) if args.avatar_split else None,
+        avatar_position=args.avatar_position,
+        avatar_ratio=args.avatar_ratio,
+        avatar_label=args.avatar_label,
         diarization_num_speakers=args.diarization_speakers,
         switch_hold_duration=args.switch_hold_duration,
         switch_blend_duration=args.switch_blend_duration,
@@ -971,7 +1033,13 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         use_advanced_text_on_hook=args.advanced_text_hook,
         # ASS position values
         ass_align_916=ASS_ALIGN_916,
-        ass_margin_916=ASS_MARGIN_916,
+        # With the avatar at the bottom, captions sit just above the seam (and its label)
+        # instead of over the avatar's face.
+        ass_margin_916=(
+            int(1920 * args.avatar_ratio) + 70
+            if args.avatar_split and args.avatar_position == "bottom"
+            else ASS_MARGIN_916
+        ),
         ass_font_916=ASS_FONT_916,
         special_word_scale_916=SPECIAL_WORD_SCALE_916,
         ass_align_169=ASS_ALIGN_169,
@@ -997,6 +1065,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         transcriber_model=args.transcriber_model,
         transcriber_language=args.transcriber_language,
         transcriber_chunk_minutes=args.transcriber_chunk_minutes,
+        transcript_cache=not args.no_transcript_cache,
         # AI
         ai_provider=args.ai_provider,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),

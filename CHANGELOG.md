@@ -8,6 +8,24 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
+## [v3.3.0] - 2026-10-15
+
+### Added
+- **Transcript cache**: The transcript (local Whisper or Groq) is saved next to the source video and reused when the same video runs again with the same transcription settings (transcriber, model, language, words per subtitle), so a re-run after a failed Gemini call no longer pays for the Groq API again. A different video or setting transcribes again; `--no-transcript-cache` forces it.
+- **Avatar split (`--avatar-split FILE`)**: The TikTok-style layout of a clip plus the channel's avatar. The face-tracked clip fills the top panel (1080x1056, a wider crop than 9:16) and the avatar fills the bottom 45%: a video loops for the whole clip, an image stays still, both scaled to cover the panel. `--avatar-label "@channel"` draws a white label on the seam, and captions move just above it so they never cover the avatar's face. Captions default to `box` style, `CINEMATIC` font and 3 words per group in this layout (explicit flags win). The README has a Google Flow image-to-video prompt to turn a still avatar into an idle loop. `--avatar-position top` and `--avatar-ratio` (0.2-0.6) change the layout. Works with the hook, B-roll (over the clip panel), music and watermark; not combinable with `--split-screen`, `--camera-switch` or `--handoff`.
+
+### Changed
+- **Clips end when the speaker's point ends**: The clip-selection prompt now treats every clip as a complete thought unit — the idea is opened, developed and closed, and the clip ends at the speaker's last sentence before the topic changes, not at the first sentence that sounds conclusive. Explaining or restating the same idea (an analogy, an example) is kept instead of cut as filler, the 20 s minimum is a hard limit, the hook no longer pulls the start forward (it plays as a separate teaser), and `keep_segments` never drops the conclusion. On a test interview the top clip went from 9 s, stopping right after an analogy was introduced, to 65 s, ending on the speaker's conclusion.
+- **Default Gemini model is now `gemini-3.8-flash`**, with `gemini-3.1-flash-lite` as the fallback (swapped). With the new prompt, flash-lite still ended the test clip mid-idea in 2 of 3 runs; flash got it right in 2 of 2. Pass `--gemini-model gemini-3.1-flash-lite` to keep the cheaper model.
+
+### Fixed
+- **`Montserrat-Black.ttf` appearing in the project root**: The thumbnail looked for its font in the project root and downloaded it there, while everything else uses `custom_fonts/`. It now uses `custom_fonts/Montserrat-Black.ttf` (downloaded there if missing). A copy left in the root can be deleted.
+- **A new URL reused the previous video**: Single-URL runs always download to `original_video.mp4`, and yt-dlp skips a download whose file already exists, so the clips (and transcript) came from the last video instead of the new one. The video's source URL and quality are now saved next to it (`original_video.mp4.source`); a different source removes the old video and its subtitles first, and the same source is reused.
+- **Render failing with `'charmap' codec can't decode byte 0x81`**: FFmpeg's log (UTF-8) was read with the Windows default code page. All FFmpeg/ffprobe output is now decoded as UTF-8. When reading the log fails anyway, FFmpeg is stopped instead of left running, and a temp file that cannot be removed (WinError 32) only prints a warning instead of hiding the real error.
+- **`--camera-switch` crashed before rendering**: The renderer did not accept the `broll_data` argument the pipeline passes (TypeError on the main clip, UnboundLocalError on the hook), and a custom hook passed no speaker data. Camera-switch mode now renders; a custom hook shows the blurred wide shot.
+- **Crop panning across the background at camera cuts and while a face is missing**: Between two face samples the crop moved in a straight line, so a cut to another face or angle became a quick pan (hybrid, split-screen and camera-switch), and in split-screen and camera-switch a speaker whose face was not seen for a while slid slowly across the frame. Cuts now step, and across gaps the crop holds its last position until the face is seen again. On a 55s test, the hybrid crop had 9 panning steps around 5 camera cuts before and none after.
+- **One frame at a stale position after switching speakers** (split-screen full layout and camera-switch, with the default `--switch-blend-duration 0`): the first frame used the speaker's position from when they were last shown, which can be seconds old.
+
 ## [v3.2.0] - 2026-10-13
 
 ### Added

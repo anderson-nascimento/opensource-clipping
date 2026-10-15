@@ -45,6 +45,7 @@
 | **Auto YouTube Uploader** | Automatically upload highlight clips to YouTube with scheduling support and full metadata (optional) |
 | **Auto Facebook Reels Uploader** | Upload Reels to Facebook Pages via Meta Graph API with smart scheduling — first clip publishes immediately, subsequent clips auto-schedule at configurable intervals (optional) |
 | **Podcast Split-Screen** | Auto speaker diarization via **Pyannote** with top-bottom split-screen layout for podcasts (9:16). Supports **3+ speakers across multiple scenes** with per-speaker frozen frame fallback |
+| **Avatar Split** | Clip and channel avatar in one 9:16 frame: the face-tracked clip on top, your avatar (looping video or image) below, with an optional channel label on the seam and captions just above it |
 | **Podcast Camera Switch** | Auto active-speaker detection with scene-aware switching — full 9:16 crop focuses on whoever is talking; blurred pillarbox only when speakers in the same scene talk simultaneously (9:16) |
 | **HyperFrames Handoff** | `--handoff` exports each clip as a package (clean 9:16 clip, word-level transcript, AI plan, fonts, SFX) for the Claude Code skill `/clip-recut`, which designs split layouts, full-screen takeovers, kinetic type and one-word captions with **[HyperFrames](https://hyperframes.heygen.com)** and renders the final Short |
 | **AI Voice-Over** | Converts auto-clips into original commentary/reaction videos using **Gemini** (script generation) and **edge-tts** (free text-to-speech), complete with audio ducking, text override, and ambient edge glow |
@@ -274,10 +275,10 @@ python main.py --help
 | `--video-preset` | `auto` | Encoder preset override (NVENC: `p1`-`p7`, x264: `ultrafast`-`veryslow`). Use `auto` for default. |
 | `--video-encoder` | `auto` | Video encoder: `auto` tries NVIDIA NVENC, Intel Quick Sync (`qsv`), AMD AMF, VAAPI, then CPU `libx264`. Force one with `nvenc`, `qsv`, `amf`, `vaapi` or `cpu`. |
 | `--video-scale-algo` | `bicubic` | Resize algorithm for render (`bicubic`: balanced and fast, `lanczos`: sharpest but ~4.5x slower, `area`/`bilinear`: fastest/softer) |
-| `--words-per-sub` | `5` | Max words per karaoke subtitle group |
+| `--words-per-sub` | `5` | Max words per karaoke subtitle group (`3` with `--avatar-split`) |
 | `--hook-duration` | `3` | Hook teaser duration (seconds) |
-| `--font-style` | `HORMOZI` | Font preset (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`) |
-| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time) |
+| `--font-style` | `HORMOZI` | Font preset (`DEFAULT`, `STORYTELLER`, `HORMOZI`, `CINEMATIC`); `CINEMATIC` with `--avatar-split` |
+| `--caption-style` | `classic` | Caption look: `classic`, `box` (word in a colored box), `yellow_pop` (word turns yellow and pops), `one_word` (one big word at a time); `box` with `--avatar-split` |
 | `--caption-color` | — | Accent color for `--caption-style` as `#RRGGBB` |
 | `--no-broll` | — | Disable B-roll footage |
 | `--no-hook` | — | Disable the hook teaser |
@@ -313,8 +314,13 @@ python main.py --help
 | `--whisper-model` | `large-v3` | Whisper model size ([see here](https://github.com/SYSTRAN/faster-whisper?tab=readme-ov-file#whisper) for options) |
 | `--whisper-device` | `cuda` | Whisper device (`cuda`, `cpu`, `auto`) |
 | `--whisper-compute-type` | `float16` | Compute type for Whisper (`float32`, `float16`, `int8`, etc.) |
-| `--gemini-model` | `gemini-3.1-flash-lite` | Gemini model name |
-| `--gemini-fallback-model` | `gemini-3.8-flash` | Gemini fallback model name if main model fails |
+| `--transcriber` | `local` | `local` (Faster-Whisper) or `groq` (Groq Whisper API, needs `GROQ_API_KEY`; no GPU needed, falls back to local Whisper if the API fails) |
+| `--transcriber-model` | `whisper-large-v3` | Groq model (`whisper-large-v3` or the cheaper `whisper-large-v3-turbo`) |
+| `--transcriber-language` | auto | Spoken language for the API as an ISO-639-1 code (e.g. `pt`) |
+| `--transcriber-chunk-minutes` | `20` | Audio longer than this is split at silences before upload |
+| `--no-transcript-cache` | — | Transcribe again. By default the transcript is saved next to the source video (`original_video.mp4.transcript.json`) and reused when the same video is run with the same transcription settings, so a re-run after a failed AI analysis does not pay for the API again |
+| `--gemini-model` | `gemini-3.8-flash` | Gemini model name |
+| `--gemini-fallback-model` | `gemini-3.1-flash-lite` | Gemini fallback model name if main model fails |
 | `--lang` | `en` | Language for all generated metadata: titles, captions, hashtags and thumbnail (e.g. `en`, `pt-BR`, `es`) |
 | `--load-gemini-json` | `False` | Load the saved `gemini_response.json` from the output directory to bypass the Gemini API call |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
@@ -324,6 +330,10 @@ python main.py --help
 | `--camera-switch` | `False` | Enable camera-switch mode for podcasts — full 9:16 crop switches to the active speaker; blurred pillarbox on simultaneous speech (9:16 only, requires `HF_TOKEN`) |
 | `--switch-hold-duration` | `2.0` | Min seconds to hold on current speaker before switching (camera-switch only) |
 | `--switch-blend-duration` | `0.0` | Transition duration when switching speakers (0 = instant snap, 0.2 = smooth blend) |
+| `--avatar-split` | — | Path to your avatar (video, looped for the whole clip, or image). Splits the 9:16 frame between the face-tracked clip and the avatar; captions move just above the seam. Not combinable with `--split-screen` / `--camera-switch` |
+| `--avatar-position` | `bottom` | Where the avatar goes: `bottom` or `top` |
+| `--avatar-ratio` | `0.45` | Share of the frame height taken by the avatar (0.2–0.6) |
+| `--avatar-label` | — | Channel label drawn on the seam, e.g. `"@mychannel"` |
 | `--split-zoom` | `1.0` | Manual zoom factor for split-screen panels (e.g. 1.2, 1.5) |
 | `--split-v-align` | `0.5` | Vertical alignment for split-screen panels (0.0=top, 0.5=center, 1.0=bottom) |
 | `--split-auto-zoom` | `False` | **[New]** Automatically zoom into each panel to separate speakers for a clean frameless look |
@@ -472,6 +482,46 @@ python main.py --url "VIDEO_URL" --voiceover --voiceover-lang id --voiceover-voi
 > BGM files shorter than the video will be **auto-looped** (`-stream_loop -1`).
 >
 > See `assets/bgm/README.md` for recommended sources to download free BGM.
+
+## 🧑 Avatar Split (clip + channel avatar)
+
+The TikTok-style layout: the face-tracked clip on top and your channel avatar below, with an
+optional channel label on the seam. Captions move just above the label so they never cover the
+avatar's face.
+
+```bash
+python main.py --url "VIDEO_URL" --avatar-split assets/avatar/my-avatar-loop.mp4 --avatar-label "@mychannel"
+```
+
+- The avatar can be a **video** (looped for the whole clip) or an **image** (stays still).
+  Either is scaled to cover its panel (1080x864 by default) and center-cropped.
+- Captions default to `--caption-style box --font-style CINEMATIC --words-per-sub 3` in this
+  layout (condensed text that fits the band above the seam on one line); any of these flags
+  given explicitly wins.
+- `--avatar-position top` puts the avatar on top; `--avatar-ratio` (0.2–0.6, default 0.45)
+  sets its share of the frame height.
+- Hook, B-roll (over the clip panel), music and watermark work as usual. Not combinable with
+  `--split-screen`, `--camera-switch` or `--handoff`.
+
+**Animating a still avatar.** A frozen picture looks static next to the clip. To get a few
+seconds of motion, use [Google Flow](https://flow.google.com) in two steps, so the avatar looks
+up at the clip playing above it, as if watching and reacting to it:
+
+1. **Image** (Nano Banana, attach the avatar image): a copy of the avatar looking up.
+
+   ```text
+   The same man from the image, identical face, hair, clothes, background and lighting, with his head tilted slightly up and his eyes looking upward above the camera, as if watching a screen just above him, with an interested, amused expression and a closed-lip smile. Same framing and camera position. Photorealistic.
+   ```
+
+2. **Video** (16:9, 720p, 8s): put that new image as both the start and the end frame, so the
+   loop has no visible seam, and send:
+
+   ```text
+   Silent video with no audio at all: no speech, no dialogue, no voice, no music, no sound effects, no ambient sound. Seamless looping shot of the person in the image watching something on a screen just above him. His head stays tilted slightly up and his eyes keep looking upward the whole time. He reacts to what he watches with subtle natural motion: slow blinks, small nods of agreement, a slight head tilt, eyebrows raising a little, a brief amused smile. His lips stay closed the whole time. The video ends in exactly the same pose and expression as it starts. Static locked-off camera, no zoom, no pan, no cuts. Background, lighting and clothes stay exactly the same. No text, no logos. Realistic, smooth, calm.
+   ```
+
+Download the video and pass it to `--avatar-split` (with the default layout the clip is above
+the avatar; with `--avatar-position top`, ask for looking down instead).
 
 ## 🎞️ HyperFrames Handoff (motion design in Claude Code)
 

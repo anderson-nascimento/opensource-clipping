@@ -47,10 +47,12 @@ utils = _load_studio_internal_module("utils.py", "clipping_studio_utils")
 _get_cv2_interpolation = utils._get_cv2_interpolation
 _resize_frame = utils._resize_frame
 SequentialFrameSampler = utils.SequentialFrameSampler
+interpolate_track = utils.interpolate_track
 _get_render_dims = utils._get_render_dims
 _is_vertical_ratio = utils._is_vertical_ratio
 RATIO_MAP = utils.RATIO_MAP
 
+avatar_split = _load_studio_internal_module("avatar_split.py", "clipping_studio_avatar_split")
 broll = _load_studio_internal_module("broll.py", "clipping_studio_broll")
 crop_center_broll = broll.crop_center_broll
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
@@ -230,9 +232,20 @@ def create_hybrid_video(
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+    # Clip + avatar layout: the clip fills only its panel, so the crop takes the panel's
+    # (wider, about 1:1) aspect ratio instead of 9:16.
+    avatar_layout = None
+    if getattr(cfg, "avatar_split", None) and ratio == "9:16" and not cfg.dev_mode:
+        avatar_layout = avatar_split.AvatarLayout(cfg, *_get_render_dims(cfg, ratio, source_h=height))
+
     # Dynamic crop dimensions based on target ratio
     w_part, h_part = RATIO_MAP.get(ratio, (16, 9))
-    if _is_vertical_ratio(ratio):
+    if avatar_layout:
+        panel_ratio = avatar_layout.out_w / avatar_layout.clip_h
+        crop_w, crop_h = min(width, int(height * panel_ratio)), height
+        if crop_w == width:
+            crop_h = min(height, int(width / panel_ratio))
+    elif _is_vertical_ratio(ratio):
         crop_w = int(height * w_part / h_part)
         crop_h = height
     else:
@@ -335,20 +348,13 @@ def create_hybrid_video(
         raw_data, crop_w, width, DEADZONE_RATIO, SMOOTH_FACTOR, SNAP_THRESHOLD, TRACK_HOLD, SNAP_CONFIRM
     )
 
+    # A cut (a jump of at least the snap distance) steps between samples instead of panning.
+    smooth_times = [d["time"] for d in smooth_data]
+    cut_px = width * (SNAP_THRESHOLD if SNAP_THRESHOLD < 0.1 else 0.08)
+
     def get_x(t):
-        if not smooth_data:
-            return default_cx
-        if t <= smooth_data[0]["time"]:
-            return smooth_data[0]["cx"]
-        if t >= smooth_data[-1]["time"]:
-            return smooth_data[-1]["cx"]
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                cx1, cx2 = smooth_data[i]["cx"], smooth_data[i + 1]["cx"]
-                if t1 == t2: return cx1
-                return cx1 + (cx2 - cx1) * (t - t1) / (t2 - t1)
-        return default_cx
+        pos = interpolate_track(smooth_data, smooth_times, t, ("cx",), cut_px)
+        return default_cx if pos is None else pos[0]
 
     def get_box(t):
         if not raw_data:
@@ -363,26 +369,8 @@ def create_hybrid_video(
         return None
 
     def _get_pos(t):
-        if not smooth_data:
-            return default_cx, default_cy
-        if t <= smooth_data[0]["time"]:
-            return smooth_data[0]["cx"], smooth_data[0]["cy"]
-        if t >= smooth_data[-1]["time"]:
-            return smooth_data[-1]["cx"], smooth_data[-1]["cy"]
-
-        for i in range(len(smooth_data) - 1):
-            if smooth_data[i]["time"] <= t <= smooth_data[i + 1]["time"]:
-                t1, t2 = smooth_data[i]["time"], smooth_data[i + 1]["time"]
-                cx1, cx2 = smooth_data[i]["cx"], smooth_data[i + 1]["cx"]
-                cy1, cy2 = smooth_data[i]["cy"], smooth_data[i + 1]["cy"]
-                if t1 == t2:
-                    return cx1, cy1
-                frac = (t - t1) / (t2 - t1)
-                return (
-                    cx1 + (cx2 - cx1) * frac,
-                    cy1 + (cy2 - cy1) * frac
-                )
-        return default_cx, default_cy
+        pos = interpolate_track(smooth_data, smooth_times, t, ("cx", "cy"), cut_px)
+        return (default_cx, default_cy) if pos is None else pos
 
     def format_seconds(s):
         mins = int(s) // 60
@@ -402,6 +390,8 @@ def create_hybrid_video(
         writer_w, writer_h = 1920, 1080
     else:
         writer_w, writer_h = base_out_w, base_out_h
+    # Size of the face-tracked image (and of B-roll over it): the whole frame, or the clip panel.
+    panel_w, panel_h = (base_out_w, avatar_layout.clip_h) if avatar_layout else (base_out_w, base_out_h)
 
     writer = open_ffmpeg_video_writer(
         output_video, writer_w, writer_h, orig_fps, video_encoder
@@ -435,7 +425,7 @@ def create_hybrid_video(
                 x1_crop = int(max(0, min(cx_base - crop_w // 2, width - crop_w)))
                 y1_crop = int(max(0, min(cy_base - crop_h // 2, height - crop_h)))
                 cropped = main_frame[y1_crop : y1_crop + crop_h, x1_crop : x1_crop + crop_w]
-                frame_normal = _resize_frame(cropped, (base_out_w, base_out_h))
+                frame_normal = _resize_frame(cropped, (panel_w, panel_h))
             else:
                 # 16:9 landscape: fit-to-height with letterbox (no stretch)
                 cx_base, cy_base = default_cx, default_cy
@@ -533,9 +523,9 @@ def create_hybrid_video(
                         progress_broll = elapsed_broll / total_broll_duration if total_broll_duration > 0 else 0
                         zoom_factor = 1.0 + ((MAX_ZOOM - 1.0) * progress_broll)
 
-                        frame_b_crop = crop_center_broll(frame_b, base_out_w, base_out_h)
-                        M = cv2.getRotationMatrix2D((base_out_w / 2, base_out_h / 2), 0, zoom_factor)
-                        frame_b_zoomed = cv2.warpAffine(frame_b_crop, M, (base_out_w, base_out_h))
+                        frame_b_crop = crop_center_broll(frame_b, panel_w, panel_h)
+                        M = cv2.getRotationMatrix2D((panel_w / 2, panel_h / 2), 0, zoom_factor)
+                        frame_b_zoomed = cv2.warpAffine(frame_b_crop, M, (panel_w, panel_h))
 
                         alpha = 1.0
                         if elapsed_broll < TRANSITION_DUR:
@@ -548,6 +538,9 @@ def create_hybrid_video(
                         else:
                             selected_frame = cv2.addWeighted(frame_b_zoomed, alpha, selected_frame, 1.0 - alpha, 0)
                     break
+
+            if avatar_layout:
+                selected_frame = avatar_layout.compose(selected_frame, t)
 
             # --- 4. WATERMARK OVERLAY ---
             if getattr(cfg, "watermark_enabled", False):
@@ -599,7 +592,9 @@ def create_hybrid_video(
         cap.release()
         for bc in broll_caps:
             bc["cap"].release()
-            
+        if avatar_layout:
+            avatar_layout.close()
+
     return get_x
 
 

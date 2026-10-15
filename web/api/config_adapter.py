@@ -25,6 +25,7 @@ from clipping.config import (
     BGM_DIR,
     FONT_LIST,
     GEMINI_FALLBACK_MODEL,
+    GEMINI_MODEL,
     THUMBNAIL_FONT_NAME,
     RENDER_OUTPUT_HEIGHT,
     SPECIAL_WORD_SCALE_169,
@@ -120,7 +121,7 @@ def build_config_from_payload(
         font_dir=font_dir,
         original_video_file=original_video_file,
         file_font_thumbnail=os.path.abspath(
-            os.path.join(base_dir, THUMBNAIL_FONT_NAME)
+            os.path.join(font_dir, THUMBNAIL_FONT_NAME)
         ),
         file_mediapipe_model=os.path.abspath(
             os.path.join(base_dir, "blaze_face_full_range.tflite")
@@ -208,7 +209,7 @@ def build_config_from_payload(
         ai_provider=ai_provider,
         api_key_nvidia=env.get("NVIDIA_API_KEY", os.environ.get("NVIDIA_API_KEY", "")),
         nvidia_model=payload.get("nvidia_model", "deepseek-ai/deepseek-v4-pro"),
-        gemini_model=payload.get("gemini_model", "gemini-3.1-flash-lite"),
+        gemini_model=payload.get("gemini_model", GEMINI_MODEL),
         content_lang=payload.get("content_lang", "en"),
         gemini_fallback_model=payload.get("gemini_fallback_model", GEMINI_FALLBACK_MODEL),
         load_gemini_json=payload.get("load_gemini_json", False),

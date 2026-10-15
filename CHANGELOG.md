@@ -8,7 +8,7 @@ All notable changes to the **OpenSource Clipping** project will be documented in
 - **Patch (x.y.Z)**: Incremented for backward-compatible bug fixes or minor patches.
 
 
-## [Unreleased]
+## [v3.3.0] - 2026-10-15
 
 ### Added
 - **Transcript cache**: The transcript (local Whisper or Groq) is saved next to the source video and reused when the same video runs again with the same transcription settings (transcriber, model, language, words per subtitle), so a re-run after a failed Gemini call no longer pays for the Groq API again. A different video or setting transcribes again; `--no-transcript-cache` forces it.

@@ -13,7 +13,8 @@ the nearest sentence edge, with limits so a clip never grows or shrinks by much:
             short (up to MAX_END_BACK); else forward up to MAX_END_FWD
 
 A sentence ends at a word ending in . ? ! … or before a pause of SENTENCE_PAUSE seconds.
-Starts get a small lead-in and ends a short tail, never overlapping a neighbouring word.
+Starts get a small lead-in and ends a short tail, never overlapping a neighbouring word
+(unless the transcriber's word timestamps overlap: then the cut sits on the word's own edge).
 """
 
 import re
@@ -61,6 +62,7 @@ def _start_at(words: list[dict], k: int, floor: float) -> float:
     t = words[k]["start"] - LEAD_IN
     if k > 0:
         t = max(t, words[k - 1]["end"] + 0.02)
+    t = min(t, words[k]["start"])   # overlapping timestamps must not cut into the word
     return max(t, floor)
 
 
@@ -68,6 +70,7 @@ def _end_at(words: list[dict], j: int, ceil: float | None) -> float:
     t = words[j]["end"] + TAIL
     if j + 1 < len(words):
         t = min(t, words[j + 1]["start"] - 0.02)
+    t = max(t, words[j]["end"])   # overlapping timestamps must not cut into the word
     return min(t, ceil) if ceil is not None else t
 
 

@@ -716,6 +716,9 @@ SEGMENT-BASED TRIMMING (KEEP SEGMENTS — REQUIRED):
 - Each segment contains: start_time and end_time.
 - Segments must be in chronological order and must not overlap.
 - If the whole clip is already dense and engaging, just create 1 segment covering the entire duration.{_silence_hint}
+- keep_segments may only remove: stutters, false starts, repeated words, filler reactions from another speaker ("aham", "entendi"), off-topic asides and dead air.
+- NEVER remove: the conclusion, the explanation of an analogy or example, or the sentences that link the setup to the payoff. The last keep_segment must end at the clip's end_time (the closing sentence).
+- After trimming, the clip must still pass the FINAL SELF-CHECK.
 - Fill the "keep_segments" field as an array of objects (start_time, end_time).
 """
     return f"""
@@ -725,61 +728,69 @@ Read the following video transcript. Transcript format:
 [start_second - end_second] text
 
 MAIN TASK:
-- Find the {num_clips} most interesting, strongest, most shareable moments with the highest viral potential to turn into short clips.
-- Sort the clips by viral_score from highest (most viral potential) to lowest. The "rank" is only a sequence number (1, 2, 3...).
+- Find the {num_clips} best moments to turn into short clips.
+- Every clip MUST be a COMPLETE THOUGHT UNIT: one idea that a speaker opens, develops and closes (see THOUGHT UNITS). Completeness is a hard requirement, not a preference. Virality only decides WHICH complete units you pick and how you rank them.
+- Sort the clips by viral_score from highest to lowest. The "rank" is only a sequence number (1, 2, 3...).
 - For each clip, produce the clip timing, hook, typography plan, b-roll plan, selection reason, cross-platform metadata, and target account classification.
 - All output must be highly relevant to the clip's content, not to the full video in general.
 
+THOUGHT UNITS (DO THIS FIRST, INTERNALLY — DO NOT OUTPUT):
+- Before choosing any clip, read the whole transcript and split it into thought units.
+- A unit STARTS when a speaker opens an idea: a claim, the answer to a question, a story, an analogy, a list, a piece of advice.
+- A unit ENDS only when the speaker is DONE with the idea, i.e. right before the topic changes:
+  a) another speaker asks a NEW question or changes the subject;
+  b) the same speaker explicitly moves on to a different subject ("agora, outra coisa...", "mas além disso...");
+  c) the speaker goes into a long digression unrelated to the idea.
+- The unit's closing sentence is the speaker's LAST sentence on the idea before that topic change — usually a concluding sentence that sums up or restates the idea (e.g. Portuguese: "Então...", "Ou seja...", "Por isso...", "É por isso que...", "No fim das contas..."; English: "So...", "That's why...", "In the end..."), or the answer/outcome/punchline the idea was building towards.
+- A sentence that only SOUNDS conclusive is not the end if the same speaker keeps going on the same idea after it (more explanation, another example, the analogy again). Keep reading until the topic actually changes.
+- Speakers usually state an idea, then explain it, give an example or an analogy, sometimes repeat the analogy in another form, and only then conclude. ALL of that belongs to the same unit. Explaining, illustrating or restating the SAME idea is development, NOT rambling.
+- Short reactions from another person ("aham", "entendi", "nossa") do not end a unit.
+- Ignore cold-open teasers: if the first seconds of the video repeat a passage that appears later, work with the later, full occurrence.
+
 CLIP SELECTION & VIRALITY RULES:
-- Clip duration must be {MIN_CLIP_DURATION}-{MAX_CLIP_DURATION} seconds.
-- Pick parts with emotion, conflict, surprise, insight, strong opinions, practical lessons, or a clear punchline.
-- Evaluate the viral strength (virality) and give a "viral_score" (1-100) representing how viral a clip could be.
+- Choose among complete thought units (or a run of consecutive units about the same subject).
+- Clip duration must be {MIN_CLIP_DURATION}-{MAX_CLIP_DURATION} seconds. This is a HARD limit:
+  - If a complete unit is shorter than {MIN_CLIP_DURATION} s, include the setup that leads into it or the next unit on the same subject. Never return a clip shorter than {MIN_CLIP_DURATION} s.
+  - If a unit is longer than {MAX_CLIP_DURATION} s, pick a sub-part that is itself complete (it opens and closes its own point), or use keep_segments to drop filler. Never drop the ending.
+- Prefer completeness over brevity: a complete 70-second idea is better than a punchy 15-second fragment that stops before the point is made.
+- Pick units with emotion, conflict, surprise, insight, strong opinions, practical lessons, or a clear punchline.
+- Evaluate virality and give a "viral_score" (1-100).
   - 90-100: Very high FYP/viral potential, strong emotion/conflict, very punchy hook.
   - 80-89: Interesting, likely to perform well.
   - 70-79: Standard, informative but maybe lacking punch.
-- Prioritize parts that stay interesting even when watched without the full video's context.
+- The clip must be understandable without the rest of the video.
 - Avoid clips whose content is too similar to each other.
-- Do not pick clips that feel flat, rambling, or have no clear payoff.
+- Do not pick units that are flat or that never reach a clear point.
 
-RETENTION & CLIP STRUCTURE RULES:
-- Make sure the first 3 seconds of the clip have a strong pull: a hook, conflict, curiosity, a sharp statement, emotion, or an implicit question.
-- An ideal clip has the structure:
-  hook -> short context -> tension/insight -> payoff.
-- Do not pick clips that only become interesting after running too long.
-- If the beginning of the segment is too slow, move start_time to a stronger sentence.
-- If the payoff is already over, do not extend the clip without a reason.
-- Do not include intros, small talk, long pauses, or transitions that do not add appeal.
-- Prioritize clips that make viewers want to:
-  1. stop scrolling,
-  2. watch until the end,
-  3. comment,
-  4. share,
-  5. save,
-  6. or feel "this is so me".
+CLIP STRUCTURE:
+- Ideal structure: hook -> short context -> development (explanation / example / analogy) -> conclusion/payoff.
+- The payoff is the moment the speaker DELIVERS the point (the conclusion, the answer, the outcome), not the first striking sentence. A striking opening statement is a hook, not a payoff.
 
-TIMING CUT RULES:
-- start_time must begin as close as possible to the first strong moment, not just the start of the topic.
-- end_time must stop after the payoff, conclusion, punchline, or main emotional beat is finished.
-- Do not cut too early if a sentence is still unfinished.
-- Do not continue the clip too long after the core message is finished.
-- The clip must still be understandable without watching the parts before or after it.
-- If two strong moments are very close together and support each other, they may be merged as long as the duration stays {MIN_CLIP_DURATION}-{MAX_CLIP_DURATION} seconds.
-- If two strong moments have different angles, split them into separate clip candidates.
+START RULES:
+- start_time = the first sentence of the thought unit. You may start at a later, stronger sentence of the same unit only if everything after it is still fully understandable.
+- The first sentence must not depend on earlier context: no unexplained pronouns or references ("ele", "isso", "esse caso", "he", "that") pointing to something said before the clip. If it does, start earlier at the sentence that introduces it.
+- In interviews, if the answer only makes sense together with the question, start at the question.
+- Do NOT move start_time just to put the hook first: the hook is played separately as a teaser before the clip (see HOOK), so the clip itself should start where the idea starts.
+- Skip greetings, intros and small talk that come before the idea.
+
+END RULES (MOST IMPORTANT):
+- end_time = the end of the sentence that closes the thought unit (see THOUGHT UNITS), plus padding.
+- Before fixing end_time, keep reading the transcript after it until the topic actually changes. If the SAME speaker is still developing the SAME idea (explaining the analogy, another example, the analogy again, the conclusion), the unit is NOT finished: move end_time forward to the last sentence before the topic change.
+- A clip is INCOMPLETE and must be extended if its last sentence:
+  - sets up something not yet delivered ("imagine X and Y", "let me explain", "there are three signs" with fewer than three given, a question not yet answered);
+  - is an example or analogy whose meaning has not been explained yet;
+  - ends on a connector or an open clause ("porque", "e aí", "então", "but", a trailing comma);
+  - is immediately followed by the same speaker explaining or concluding what they just said.
+- Once the unit is closed, stop: do not run into the next question, the next topic or the reaction after it.
+- Never cut in the middle of a sentence.
 
 INTERNAL VIRAL_SCORE ASSESSMENT:
-Score viral_score 1-100 based on the following components. This is only for internal assessment, DO NOT add new fields to the JSON.
-- Hook strength: 1-20
-- Emotional intensity: 1-20
-- Shareability/comment potential: 1-20
-- Standalone clarity: 1-20
-- Payoff/retention: 1-20
-
-Scoring guide:
-- Hook strength: how strongly the first 3 seconds make people stop scrolling.
-- Emotional intensity: how strong the emotion, conflict, frustration, humor, emotional touch, anger, awe, or relatability is.
-- Shareability/comment potential: how likely people are to comment, debate, tag friends, share, or save.
-- Standalone clarity: how easy the clip is to understand without the full video's context.
-- Payoff/retention: how clear the reward for watching until the end is, such as a punchline, insight, twist, conclusion, or practical lesson.
+Completeness is a gate, not a score: a clip that does not close its idea is disqualified, whatever its other qualities. Among complete clips, score viral_score 1-100 as the sum of the following components. This is only for internal assessment, DO NOT add new fields to the JSON.
+- Hook strength: 1-20 — how strongly the first 3 seconds make people stop scrolling.
+- Emotional intensity: 1-20 — how strong the emotion, conflict, humor, awe, or relatability is.
+- Shareability/comment potential: 1-20 — how likely people are to comment, debate, tag friends, share, or save.
+- Standalone clarity: 1-20 — how easy the clip is to understand without the full video's context.
+- Payoff: 1-20 — how satisfying the conclusion, answer, twist or lesson is when it lands at the end.
 - Do not pick clips with a viral_score below 70 unless the number of good moments in the transcript is very limited.
 
 TARGET ACCOUNT CLASSIFICATION (FOR EACH CLIP):
@@ -797,7 +808,7 @@ HOOK (REQUIRED):
 - Save it as hook_start_time and hook_end_time.
 - The hook must make people want to keep watching, but no fake clickbait.
 - Make sure the hook is natural and actually spoken in the transcript.
-- If the best hook is not right at the start of the clip candidate, adjust start_time so the hook appears as early as possible.
+- The hook is played as a separate teaser before the clip, so it can come from anywhere inside the clip. Do not cut the beginning of the idea just to make the hook come first.
 - The hook must work as on-screen opening text to keep viewers in the first 3 seconds.
 
 TYPOGRAPHY PLAN (KINETIC TYPOGRAPHY):
@@ -928,6 +939,14 @@ OUTPUT RULES:
 - All fields are required.
 - When in doubt, prioritize accuracy to the clip's content over excessive creativity.
 {_hook_v2_prompt}{_segment_prompt}
+
+FINAL SELF-CHECK (INTERNAL, FOR EVERY CLIP, BEFORE WRITING THE JSON):
+1. State the clip's single idea in one sentence. If you cannot, the clip is not a unit — fix it.
+2. Read the clip's LAST sentence. Does it close that idea? Would a viewer be left asking "and then?" or "what does that mean?"? If yes, extend end_time.
+3. Read what comes right AFTER end_time. If it is the same speaker continuing the same idea, extend.
+4. Read the clip's FIRST sentence. Does it make sense with no prior context? If not, start earlier.
+5. Is the duration between {MIN_CLIP_DURATION} and {MAX_CLIP_DURATION} seconds? If not, fix it.
+Only output clips that pass all five checks.
 
 REQUIRED JSON STRUCTURE (follow these field names strictly):
 [

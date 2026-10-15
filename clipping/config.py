@@ -964,7 +964,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         font_dir=font_dir,
         original_video_file=os.path.abspath(os.path.join(base_dir, "original_video.mp4")),
         file_font_thumbnail=os.path.abspath(
-            os.path.join(base_dir, THUMBNAIL_FONT_NAME)
+            os.path.join(font_dir, THUMBNAIL_FONT_NAME)
         ),
         file_mediapipe_model=os.path.abspath(
             os.path.join(base_dir, "blaze_face_full_range.tflite")
